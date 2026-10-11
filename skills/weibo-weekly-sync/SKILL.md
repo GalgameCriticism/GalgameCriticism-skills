@@ -50,7 +50,7 @@ npx -y bun weibo-article.ts <private-material-dir>/preview.md \
   --profile <private-profile>/baoyu-skills/chrome-profile
 ```
 
-首次使用在同一个独立 profile 中手动登录微博，然后关闭该 profile 的手动 Chrome，再运行脚本；不能让手动 Chrome 和 CDP 自动化同时占用同一 profile，也不要为此重启或杀掉普通 Chrome。脚本会填充头条文章，不会把“保存草稿”当作发布。
+首次使用由用户在独立 profile 中手动登录微博；如果该 profile 被手动 Chrome 占用，skill 必须停下并提示用户自行关闭或解锁，不能自动启动、接管、关闭、重启或杀掉任何 Chrome，也不能使用普通 Chrome profile。脚本会填充头条文章，不会把“保存草稿”当作发布。
 
 发布前必须验证：标题不超过 32 字、导语不超过 44 字、正文图片数与 manifest 一致、没有 `WBIMGPH_` 占位符、页面显示目标昵称。用户已授权直接发布时，再点击编辑器中精确匹配的“发布”按钮，禁止点击“保存草稿”；捕获 `draft/publish` 响应并核对成功码后，访问返回的 `https://weibo.com/ttarticle/p/show?id=...` 公开地址验证标题和正文。
 

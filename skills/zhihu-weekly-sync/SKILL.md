@@ -7,6 +7,16 @@ description: 在用户要求把获授权的周报发布到知乎文章/专栏、
 
 本 skill 是知乎发布端适配器：把经核验的周报素材发布为知乎文章。素材可以来自 B 站、微博或用户提供的知乎文章 URL；发布授权来自当前任务，目标账号必须在发布前核对。
 
+## 浏览器与登录态安全边界
+
+这是本 skill 的最高优先级约束：
+
+- skill 不得自动启动、重启、接管、关闭或杀掉用户的 Chrome/Chromium，不得调用 `osascript`、`pkill`、`killall`、`--reset`、`--clean`、`--fresh` 或删除/移动/覆盖浏览器 profile 的命令。
+- 只允许使用用户明确指定的独立自动化 profile；禁止把 `~/Library/Application Support/Google/Chrome`、`Default`、普通 `Profile *` 或其他日常浏览器目录作为 `LIDUMA_AGENT_BROWSER_PROFILE`。profile 路径不明确、是符号链接、被普通 Chrome 占用或登录状态不明时，立即停止。
+- 不得自动弹出登录窗口或执行会打开 Chrome 的登录辅助脚本。登录、关闭占用窗口和账号切换只能由用户手动完成；skill 只读取登录结果，不代替用户处理浏览器生命周期。
+- 当前 `liduma-article-publisher` 的 CLI 会自行调用浏览器打开逻辑，因此不能由 skill 自动调用。只有在上游提供“连接用户已启动的隔离会话、不会新建/重置浏览器”的 attach 模式并通过只读检查后，才允许接入；否则停下并报告，不能为了继续发布而启动浏览器。
+- 发布或核验结束后不得执行 `agent-browser close`、清理 profile 或删除缓存。遇到 profile 锁、启动失败或登录失效，只报告并等待用户处理。
+
 ## 默认发布适配器：agent-browser 持久化 profile
 
 跨平台周报发布默认使用已跑通的 [guoxiaoyi/liduma-article-publisher](https://github.com/guoxiaoyi/liduma-article-publisher)，而不是把旧 MCP 的 Cookie 文件当作通用登录态：
@@ -16,22 +26,13 @@ git clone https://github.com/guoxiaoyi/liduma-article-publisher.git <private-wor
 cd <private-workdir>/liduma-article-publisher
 npm install --no-audit --no-fund
 npm install agent-browser --no-audit --no-fund
-npx agent-browser install
 ```
 
-使用独立 profile 登录并检查写作页：
-
-```bash
-LIDUMA_AGENT_BROWSER_PROFILE=<private-profile>/openclaw/browser-profiles/zhihu \
-AGENT_BROWSER_HEADED=false \
-npx tsx src/cli.ts --check-login --platform=zhihu
-```
-
-如果未登录，适配器会自动以有头模式打开登录页；完成登录后再次确认写作页和目标账号。不要把 cookie 文件名、`z_c0` 名称或用户口头“已登录”当作账号证明。
+以上安装只安装依赖，不得启动浏览器。用户需要先手动准备并登录独立 profile；skill 不自动打开登录页。不要把 cookie 文件名、`z_c0` 名称或用户口头“已登录”当作账号证明。
 
 统一素材清单转换为临时文章目录：目录至少包含以完整标题命名的 `.docx`、`cover.png` 和 `index.md`。正文 DOCX 必须从已有 manifest 的 paragraph/image 顺序生成，并把图片作为真正的嵌入对象写入 DOCX；不能用 `textutil` 把 Markdown 直接转成“看起来像文章”的纯文本 DOCX。封面最多使用 manifest 中一张图片；不要为知乎重新抓取 B 站。
 
-从已有素材直接发布：
+只有在适配器明确支持安全 attach 模式、且用户已经启动了隔离浏览器会话时，才可以从已有素材发布：
 
 ```bash
 LIDUMA_AGENT_BROWSER_PROFILE=<private-profile>/openclaw/browser-profiles/zhihu \
@@ -41,7 +42,7 @@ npx tsx src/cli.ts --publish \
   --platform=zhihu
 ```
 
-该项目会导入 DOCX、可选上传封面并点击发布，结果写入文章目录的 `publish-log.json`。发布命令可能在写入回执后继续监听 DOM；看到成功回执后可停止监听，但必须使用同一 agent-browser 会话打开返回的公开 URL，核对标题、作者、来源链接和正文图片。公开页回读失败时不把本地日志单独当作成功。
+该项目会导入 DOCX、可选上传封面并点击发布，结果写入文章目录的 `publish-log.json`。不得让命令自行打开、重启或关闭浏览器。发布命令可能在写入回执后继续监听 DOM；看到成功回执后可停止监听，但必须使用同一隔离会话打开返回的公开 URL，核对标题、作者、来源链接和正文图片。公开页回读失败时不把本地日志单独当作成功。
 
 ## 正文图片保真检查
 
@@ -63,16 +64,7 @@ npx tsx src/cli.ts --publish \
 
 使用上游项目 [Victorzwx/zh_mcp_server](https://github.com/Victorzwx/zh_mcp_server)：
 
-```bash
-git clone https://github.com/Victorzwx/zh_mcp_server.git
-cd zh_mcp_server
-python3 -m venv .venv
-. .venv/bin/activate
-pip install -r requirements.txt
-python -m zh_mcp_server.__login__
-```
-
-登录脚本会打开 Chrome，并在终端等待验证码；Cookie 只放在本机。stdio 配置使用虚拟环境中的 Python：
+不要从 skill 执行其会打开 Chrome 的登录辅助脚本；登录必须由用户手动完成，Cookie 只放在本机。stdio 配置使用虚拟环境中的 Python：
 
 ```json
 {
@@ -90,7 +82,7 @@ python -m zh_mcp_server.__login__
 ## 工作流
 
 1. 接收统一素材清单，核对标题、正文、图片顺序、署名、来源链接和目标知乎账号；标题和正文未确认时只生成预览。
-2. 先用与发布器相同的 agent-browser profile 确认当前登录账号，再调用发布器。不要用 Cookie 文件名、profile 名或用户口头描述推断账号。
+2. 先确认用户已经准备好独立浏览器会话，再用只读方式核对当前登录账号；浏览器未运行、profile 被占用或需要登录时停下，不自动启动/接管浏览器。不要用 Cookie 文件名、profile 名或用户口头描述推断账号。
 3. 如使用旧 MCP，工具名沿用项目当前的拼写 `create_atticle`，参数为 `title`、`content`、可选 `images` 和 `topic`；它的 Cookie 文件与 Playwright profile 不互通。
 4. 若素材含图片，先完成“正文图片保真检查”；检查未通过时只修复或切换适配器，不降级成纯文本发布。
 5. 发布后回读知乎文章 URL、标题、作者、正文图片数量和封面状态；无法取得公开 URL、页面仍为登录页、账号不匹配或图片缺失时，不把提交响应单独当作成功。
