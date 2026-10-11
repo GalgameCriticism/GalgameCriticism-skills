@@ -1,0 +1,4 @@
+interface:
+  display_name: "B站周报同步小黑盒"
+  short_description: "提取文集最新图文周报，核对目标账号和社区后同步发布并验证结果"
+  default_prompt: "使用 $bilibili-xiaoheihe-weekly 将指定 B 站文集最新一期同步到我的小黑盒账号和社区。"

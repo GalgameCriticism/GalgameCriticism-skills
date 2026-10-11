@@ -1,0 +1,17 @@
+.DS_Store
+__pycache__/
+*.pyc
+node_modules/
+.env
+.env.*
+!.env.example
+cookies/
+*cookie*.json
+work/
+outputs/
+artifacts/
+*-result.json
+*-receipt.json
+*.log
+*.har
+storage-state*.json
