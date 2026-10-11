@@ -7,6 +7,9 @@
 | Skill | 用途 |
 | --- | --- |
 | [bilibili-xiaoheihe-weekly](skills/bilibili-xiaoheihe-weekly/SKILL.md) | 从 B 站文集确定最新一期，保留正文和配图，核对小黑盒账号及社区后发布并验证结果 |
+| [weibo-weekly-sync](skills/weibo-weekly-sync/SKILL.md) | 使用 `mcp-server-weibo` 获取获授权微博周报，整理素材并交给目标发布端 |
+| [zhihu-weekly-sync](skills/zhihu-weekly-sync/SKILL.md) | 使用 `zh_mcp_server` 将核验后的周报发布到知乎，并明确知乎来源读取能力边界 |
+| [weekly-cross-platform-sync](skills/weekly-cross-platform-sync/SKILL.md) | 统一路由来源与目标平台，管理安装、账号核对、素材清单、去重和回执 |
 
 ## 安装
 
@@ -15,8 +18,10 @@
 ```bash
 python /path/to/skill-installer/scripts/install-skill-from-github.py \
   --repo GalgameCriticism/skills \
-  --path skills/bilibili-xiaoheihe-weekly
+  --path skills/weekly-cross-platform-sync
 ```
+
+总工作流会按任务需要调用 `bilibili-xiaoheihe-weekly`、`weibo-weekly-sync`、`zhihu-weekly-sync` 和对应的目标发布适配器；也可以直接安装其中任意一个独立 skill。
 
 辅助脚本的依赖写在各自的 SKILL.md 中。账号信息、Cookie 文件、下载的原文与运行记录保留在使用者本机，运行时传入。
 

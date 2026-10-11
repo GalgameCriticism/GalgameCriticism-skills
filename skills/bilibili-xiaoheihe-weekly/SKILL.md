@@ -7,6 +7,34 @@ description: 将用户拥有或获授权的 B 站文集最新图文周报同步�
 
 从用户指定的文集确定最新一期，保持原文和配图，使用用户指定的小黑盒账号在指定社区发布一次。发布授权来自当前任务；已有明确授权时继续执行，无须再次要求确认。
 
+## 前置依赖：安装小黑盒 MCP
+
+小黑盒是本工作流的目标发布端。使用团队维护的 MCP 服务：
+<https://github.com/GalgameCriticism/XiaoheiheMcpServer>
+
+首次使用时：
+
+```bash
+git clone https://github.com/GalgameCriticism/XiaoheiheMcpServer.git
+cd XiaoheiheMcpServer
+dotnet build src/XiaoheiheMcpServer.Stdio/XiaoheiheMcpServer.Stdio.csproj -c Release
+```
+
+将构建后的 `XiaoheiheMcpServer.Stdio.dll` 配置为 MCP 的 stdio 服务，并按实际环境设置：
+
+```toml
+[mcp_servers.xiaoheihe]
+type = "stdio"
+command = "dotnet"
+args = ["/absolute/path/to/XiaoheiheMcpServer.Stdio.dll"]
+
+[mcp_servers.xiaoheihe.env]
+XIAOHEIHE_CHROMIUM_PATH = "/absolute/path/to/Chrome"
+XIAOHEIHE_COOKIE_PATH = "/private/path/to/account-cookie.json"
+```
+
+Cookie 文件只保存在本机并限制权限；更换账号或 `XIAOHEIHE_COOKIE_PATH` 后，必须重启 MCP 进程，让浏览器上下文重新加载 Cookie。发布前调用 `check_login_status`，以返回的用户名确认账号，不要仅凭 Cookie 文件名判断账号。
+
 ## 运行输入
 
 从用户任务和本地配置取得文集 URL、目标账号名称、目标社区（Gal 周报通常为 `Gal游戏综合区`）。Cookie 通过 `XIAOHEIHE_COOKIE_PATH` 引用本机文件，浏览器可执行文件通过 `XIAOHEIHE_CHROMIUM_PATH` 指定。不要从某个文件名推断已登录的账号。
@@ -25,7 +53,7 @@ description: 将用户拥有或获授权的 B 站文集最新图文周报同步�
 
 阅读 [references/heybox-editor.md](references/heybox-editor.md) 后使用 `scripts/publish_weekly.cjs`，或在可用浏览器会话中执行相同流程。准备模式在编辑器中核对账号、正文、图片和社区，并保存可重建的本地内容；用户任务已经授权发布时可以直接使用 `--publish` 执行完整流程。已有发布回执时使用 `--verify` 回读核验。
 
-目标账号以文章预览作者或个人主页返回值为准。旧 MCP 的 `check_login_status` 只检查 `p.user-box__username`，可能因页面更新而误报；作者预览显示指定账号且编辑器可用时，以实际页面为准。作者不匹配则停止发布，报告所需登录切换。
+目标账号以文章预览作者或个人主页返回值为准。旧版 MCP 的 `check_login_status` 只检查已经下线的 `p.user-box__username`，可能把实际已登录误报为未登录。使用上述仓库最新版本后，命令会兼容当前顶部导航、用户页和文章作者区域；作者预览显示指定账号且编辑器可用时，以实际页面为准。作者不匹配则停止发布，报告所需登录切换。
 
 小黑盒长周报使用“发布文章”编辑器。批量上传图片后，将正文和已上传图片依原始顺序粘贴为富文本。发布前核对全文、全部图片、精确匹配的社区名称，以及账号身份。仅点击发布按钮不能视为成功，必须查看发布响应和管理列表/帖子详情，取得帖子链接并核对作者和社区。
 

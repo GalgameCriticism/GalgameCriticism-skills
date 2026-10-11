@@ -1,0 +1,4 @@
+interface:
+  display_name: "知乎周报同步"
+  short_description: "将核验后的周报素材发布到知乎并验证目标账号和文章结果"
+  default_prompt: "使用 $zhihu-weekly-sync 将指定周报素材发布到我的知乎账号，先预览并核对账号后验证文章结果。"
