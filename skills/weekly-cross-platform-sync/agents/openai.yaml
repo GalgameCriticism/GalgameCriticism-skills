@@ -1,4 +1,4 @@
 interface:
   display_name: "跨平台周报同步"
   short_description: "路由 B 站、微博、知乎和小黑盒周报工作流，统一核对、去重和回执"
-  default_prompt: "使用 $weekly-cross-platform-sync 管理这次周报的来源、目标账号、预览、发布和结果验证。"
+  default_prompt: "使用 $weekly-cross-platform-sync 管理这次周报的指定期号、目标账号、发布与结果验证；最终回复直接列出每个已成功平台的可点击公开文章链接。"

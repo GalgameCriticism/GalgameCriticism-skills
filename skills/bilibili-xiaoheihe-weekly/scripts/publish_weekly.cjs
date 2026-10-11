@@ -114,6 +114,13 @@ function imageKey(url) {
   return url.split('?')[0].replace(/\/thumb\.(png|jpg|jpeg|webp)$/i, '.$1');
 }
 
+function isArticleDuplicate(rows, title) {
+  const issue = title.match(/(?:周报|速递)\s*(?:第)?\s*(\d+)\s*期/);
+  const sameIssue = issue && new RegExp(`(?:^|\\D)${issue[1]}\\s*期`);
+  return rows.some(row => row.type?.trim() !== '视频' &&
+    (row.title?.trim() === title || (sameIssue && sameIssue.test(row.title || ''))));
+}
+
 async function verifyPublished(page, manifest, urls, account, community, postUrl) {
   await page.goto(postUrl, { waitUntil: 'networkidle' });
   const article = page.locator('.hb-article');
@@ -191,9 +198,11 @@ async function main(argv) {
     if (args.verify) throw new Error('No published receipt to verify');
     const management = await context.newPage();
     await management.goto('https://www.xiaoheihe.cn/creator/content_management/home?article_type=all', { waitUntil: 'networkidle' });
-    const titles = await management.locator('.creator-content-item__title').allTextContents();
-    const issue = manifest.title.match(/(?:周报|速递)\s*(?:第)?\s*(\d+)\s*期/);
-    if (titles.some(title => title === manifest.title || (issue && title.includes(issue[1] + '期')))) throw new Error('This issue already appears in content management; recover its link and verify instead of reposting');
+    const rows = await management.locator('.creator-content-item__content').evaluateAll(elements => elements.map(row => ({
+      title: row.querySelector('.creator-content-item__title')?.textContent,
+      type: row.querySelector('.creator-content-item__type')?.textContent,
+    })));
+    if (isArticleDuplicate(rows, manifest.title)) throw new Error('This issue already appears as an article in content management; recover its link and verify instead of reposting');
     await page.goto('https://www.xiaoheihe.cn/creator/editor/draft/article', { waitUntil: 'networkidle' });
     await page.locator('.ProseMirror').nth(1).waitFor();
     const author = (await page.locator('.bbs-link-section-author-name').innerText()).trim();
@@ -238,7 +247,7 @@ async function main(argv) {
   }
 }
 
-module.exports = { normalizeCookies, renderHtml, pasteHtml, assertDocument, uploadImages, selectCommunity, loadPlaywright, sourceKey, imageKey, verifyPublished, main };
+module.exports = { normalizeCookies, renderHtml, pasteHtml, assertDocument, uploadImages, selectCommunity, loadPlaywright, sourceKey, imageKey, isArticleDuplicate, verifyPublished, main };
 if (require.main === module) main(process.argv.slice(2)).catch(() => {
   // Playwright exceptions may contain user paths, URLs or request metadata.
   console.error('Workflow stopped. Inspect the local receipt and browser state before retrying. Cookie values and raw responses are intentionally omitted.');

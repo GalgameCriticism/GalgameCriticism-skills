@@ -1,4 +1,4 @@
 interface:
   display_name: "微博周报同步"
-  short_description: "读取获授权微博最新周报，整理素材并交给目标发布端"
-  default_prompt: "使用 $weibo-weekly-sync 获取指定微博账号最新一期周报，并按目标平台流程预览、发布和验证。"
+  short_description: "读取获授权微博周报，或复用统一图文素材发布头条文章并核验"
+  default_prompt: "使用 $weibo-weekly-sync 处理获授权周报的微博读取或头条文章发布，核验图文，并在最终回复直接输出已成功发布的公开文章链接。"

@@ -27,11 +27,15 @@ node scripts/publish_weekly.cjs /local/work/weekly/manifest.json \
 - 登录后的顶部头像菜单显示账号名称/ID，文章预览作者为 `.bbs-link-section-author-name`。
 - `.ProseMirror` 第一个为标题，第二个为正文；标题限制 30 字。
 
-发布前到内容管理页检查同一期标题（包括期号）或来源链接，已有本期时回读验证。管理页只显示近期内容，不应据此推断旧文章不存在；同步历史一期时继续翻页或使用已有回执。
+发布前到内容管理页检查同一期文章标题（包括期号）或来源链接。每条 `.creator-content-item__content` 内读取 `.creator-content-item__type` 和 `.creator-content-item__title`；`视频` 不作为文章重复项，缺类型或疑似同源记录时先核实。已有本期文章时恢复公开链接并回读验证。管理页只显示近期内容，不应据此推断旧文章不存在；同步历史一期时继续翻页或使用已有回执。
 
 ## 图片和正文
 
-正文聚焦后点击 `.editor-menu-image__btn`，在插图弹窗点击 `.editor-image-wrapper__box.upload`，捕获 filechooser。它支持多文件；把完整图片集一次性传入，避免前一个批次未完成就新增批次导致插图状态异常。等待所有 `.editor-image-wrapper__box.draggable img` 出现且 `.editor-image-wrapper__box-uploading` 清零，再点击确定。
+正文聚焦后点击 `.editor-menu-image__btn`，在插图弹窗点击 `.editor-image-wrapper__box.upload`，捕获 filechooser。它支持多文件；同一批次结束前不要并发添加下一批。大图先从原 manifest 派生优化文件。保存每个源序号对应的成功 HTTPS 托管 URL；无法可靠对应序号时改为逐张上传并在每张完成后落盘缓存。
+
+等待 `.editor-image-wrapper__box-uploading` 清零，再判断成功数。成功数不足且不再上传时立刻进入恢复，不能为了凑齐计数空等：保留已成功 URL 和源序号映射，只把失败文件传入下一批，补齐后按原序号合并。图片没有可靠映射时先核实，不按弹窗“成功列表”位置猜测失败序号。
+
+当前辅助脚本的批量 `uploadImages` 只接受整批成功，无法自动从失败批次建立逐项映射。遇到部分失败，在同一会话中读取并保存成功结果、按本节恢复；完成后的 `uploaded-images.json` 为原图序的完整 URL 数组，另保存来源 SHA-256、账号和社区绑定证据。之后复用该缓存重建正文。这个限制需在无人值守回执中记录，不能宣称固定脚本已覆盖所有恢复路径。
 
 图片源 URL 来自弹窗的已完成图片元素，保留原始顺序。大量图片会遮住弹窗底部，可对已经确认的确定按钮调用 DOM `click()`。
 
@@ -46,5 +50,7 @@ node scripts/publish_weekly.cjs /local/work/weekly/manifest.json \
 一次点击发布后，`POST /bbs/app/api/link/post` 成功响应包含 `status: "ok"` 和 `link_id`。取得 `/app/bbs/link/<link_id>` 后，核验内容管理新记录和帖子详情；详情作者为 `.link-user__username`，社区为 `.link-tags__tag-item .content-tag-text`，正文为 `.hb-article`。图片按滚动位置懒加载，先逐张滚入视口，再核对 URL。公开页面会将原图 `/<hash>.png` 转为 `/<hash>/thumb.png`；按原图标识归一化后比较顺序。
 
 本地输出 `uploaded-images.json` 与 `publication-receipt.json`。准备模式只保存可重建内容的本地文件；再次执行复用上传 URL 并重建编辑器，不依赖上一次会话的本地草稿。提交前将回执写为 `submitting`，服务端响应确认后写入帖子 URL；结果不明时脚本退出并拒绝再次提交。已有帖子 URL 时，`--publish` 也只回读核验，不重复发布。
+
+公开页核验通过后，最终回复直接输出 `[小黑盒本期文章](实际postUrl)`；单独提供本地回执或说“发布成功”不满足交付要求。
 
 若返回审核状态，报告待审核并保留回执，避免重复提交。页面超时但可能提交成功时先查内容管理。Cookie 未过期不等于有效登录，最终以真实页面账号身份为准。

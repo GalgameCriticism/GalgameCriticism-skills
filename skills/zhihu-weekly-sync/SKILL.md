@@ -9,13 +9,11 @@ description: 在用户要求把获授权的周报发布到知乎文章/专栏、
 
 ## 浏览器与登录态安全边界
 
-这是本 skill 的最高优先级约束：
+遵守 [共享浏览器会话规则](../weekly-cross-platform-sync/references/browser-session.md)：优先连接已登录的独立 profile/CDP。用户明确允许自动启动时，在原进程确已退出且 profile 未被占用的情况下，可用同一可执行文件、原 profile 和原 Cookie/密钥存储配置重新启动；已有授权不重复询问。
 
-- skill 不得自动启动、重启、接管、关闭或杀掉用户的 Chrome/Chromium，不得调用 `osascript`、`pkill`、`killall`、`--reset`、`--clean`、`--fresh` 或删除/移动/覆盖浏览器 profile 的命令。
-- 只允许使用用户明确指定的独立自动化 profile；禁止把 `~/Library/Application Support/Google/Chrome`、`Default`、普通 `Profile *` 或其他日常浏览器目录作为 `LIDUMA_AGENT_BROWSER_PROFILE`。profile 路径不明确、是符号链接、被普通 Chrome 占用或登录状态不明时，立即停止。
-- 不得自动弹出登录窗口或执行会打开 Chrome 的登录辅助脚本。登录、关闭占用窗口和账号切换只能由用户手动完成；skill 只读取登录结果，不代替用户处理浏览器生命周期。
-- 当前 `liduma-article-publisher` 的 CLI 会自行调用浏览器打开逻辑，因此不能由 skill 自动调用。只有在上游提供“连接用户已启动的隔离会话、不会新建/重置浏览器”的 attach 模式并通过只读检查后，才允许接入；否则停下并报告，不能为了继续发布而启动浏览器。
-- 发布或核验结束后不得执行 `agent-browser close`、清理 profile 或删除缓存。遇到 profile 锁、启动失败或登录失效，只报告并等待用户处理。
+不得重置、清理、移动或覆盖 profile，不关闭/杀掉用户浏览器，不使用普通 Chrome `Default`、`Profile *` 或日常用户目录。正常运行的专用 profile 锁不妨碍连接其 CDP；不得删锁或另开进程抢占。登录、账号切换与验证码仍由用户处理，结束后保留用户会话。
+
+`liduma-article-publisher` CLI 可能自行启动或关闭浏览器；调用前检查本地版本行为。它不能安全连接现有会话时，改用浏览器工具连接独立 CDP 完成相同导入与发布流程，而不是将启动授权解释为可重置 profile。具体导入/恢复见 [图文文章适配说明](references/zhihu-adapter.md)。
 
 ## 默认发布适配器：agent-browser 持久化 profile
 
@@ -28,28 +26,18 @@ npm install --no-audit --no-fund
 npm install agent-browser --no-audit --no-fund
 ```
 
-以上安装只安装依赖，不得启动浏览器。用户需要先手动准备并登录独立 profile；skill 不自动打开登录页。不要把 cookie 文件名、`z_c0` 名称或用户口头“已登录”当作账号证明。
+以上命令只安装依赖。用户首次登录独立 profile；后续按共享会话规则连接或在已有授权下启动。用页面或身份接口返回的昵称/账号 ID 核对目标，不把 cookie 文件名、`z_c0` 名称或用户口头“已登录”当作账号证明。
 
 统一素材清单转换为临时文章目录：目录至少包含以完整标题命名的 `.docx`、`cover.png` 和 `index.md`。正文 DOCX 必须从已有 manifest 的 paragraph/image 顺序生成，并把图片作为真正的嵌入对象写入 DOCX；不能用 `textutil` 把 Markdown 直接转成“看起来像文章”的纯文本 DOCX。封面最多使用 manifest 中一张图片；不要为知乎重新抓取 B 站。
 
-只有在适配器明确支持安全 attach 模式、且用户已经启动了隔离浏览器会话时，才可以从已有素材发布：
-
-```bash
-LIDUMA_AGENT_BROWSER_PROFILE=<private-profile>/openclaw/browser-profiles/zhihu \
-AGENT_BROWSER_HEADED=false \
-npx tsx src/cli.ts --publish \
-  --dir=<private-material-dir>/zhihu-article \
-  --platform=zhihu
-```
-
-该项目会导入 DOCX、可选上传封面并点击发布，结果写入文章目录的 `publish-log.json`。不得让命令自行打开、重启或关闭浏览器。发布命令可能在写入回执后继续监听 DOM；看到成功回执后可停止监听，但必须使用同一隔离会话打开返回的公开 URL，核对标题、作者、来源链接和正文图片。公开页回读失败时不把本地日志单独当作成功。
+连接后从已有 manifest 导入 DOCX、上传本期封面并发布。可借鉴上游导入流程，不能在未检查生命周期行为前直接运行其 CLI。会话中断时先确认原进程，再按共享规则恢复同一会话和同一草稿；不要另建第二篇。发布日志只保存最小状态，使用同一隔离会话回读公开 URL，核对标题、作者、来源、全文和图片顺序；本地 `publish-log.json` 单独不代表成功。
 
 ## 正文图片保真检查
 
 这是硬性门槛，不满足时不能点击“发布”或“更新”：
 
-1. 上传前检查 DOCX 压缩包内 `word/media/` 的图片数与 manifest 图片块数一致；图片过大时可以压缩，但不能删图或改变顺序。
-2. 导入后等待“文档导入中”结束，再检查编辑器 `[contenteditable=true]` 内的图片元素数量和图片 URL；数量应与 manifest 一致，正文中不能残留 `![配图](...)`、`images/001.png` 等 Markdown 路径。
+1. 上传前按当前 UI 的 DOCX 大小限制预检实际字节数，超限则按 [素材压缩与续传](../weekly-cross-platform-sync/references/material-recovery.md) 从原 manifest 派生优化图片并重建 DOCX，保留全部图片及顺序。检查 DOCX 的 `word/media/`、正文嵌图对象和关系顺序；图片重复引用时以嵌图对象对应各源图片块为准。
+2. 导入后等待“文档导入中”结束，再检查正文编辑器 `.public-DraftEditor-content[contenteditable=true]` 内真实图片的数量和 HTTPS 托管 URL/图序；数量应与 manifest 一致，正文中不能残留 `![配图](...)`、`images/001.png` 等 Markdown 路径。全文比对时排除编辑器明确的“添加图片注释，不超过140字（可选）”UI 文案，不能因此删去原文。
 3. 导入超时、导入错误、图片数为 0 或仍残留 Markdown 时立即停止并报告，不得以“流程完成”或本地日志代替成功。封面上传超时只允许在正文图片已经通过检查且用户不要求封面时继续，并在回执中注明封面未设置。
 
 ## 已发布纯文本文章的纠错
@@ -82,10 +70,10 @@ npx tsx src/cli.ts --publish \
 ## 工作流
 
 1. 接收统一素材清单，核对标题、正文、图片顺序、署名、来源链接和目标知乎账号；标题和正文未确认时只生成预览。
-2. 先确认用户已经准备好独立浏览器会话，再用只读方式核对当前登录账号；浏览器未运行、profile 被占用或需要登录时停下，不自动启动/接管浏览器。不要用 Cookie 文件名、profile 名或用户口头描述推断账号。
+2. 按共享会话规则连接已有独立浏览器，或在已有明确授权、原进程已退出且 profile 无占用时自动启动同一 profile，再用只读方式核对当前账号。需要登录、存在其他进程占用或账号不匹配时停止，不重置。不要用 Cookie 文件名、profile 名或用户口头描述推断账号。
 3. 如使用旧 MCP，工具名沿用项目当前的拼写 `create_atticle`，参数为 `title`、`content`、可选 `images` 和 `topic`；它的 Cookie 文件与 Playwright profile 不互通。
 4. 若素材含图片，先完成“正文图片保真检查”；检查未通过时只修复或切换适配器，不降级成纯文本发布。
-5. 发布后回读知乎文章 URL、标题、作者、正文图片数量和封面状态；无法取得公开 URL、页面仍为登录页、账号不匹配或图片缺失时，不把提交响应单独当作成功。
+5. 发布后回读知乎文章 URL、标题、作者、完整正文、全部图片顺序和封面状态；无法取得公开 URL、页面仍为登录页、账号不匹配或图片缺失时，不把提交响应单独当作成功。最终回复必须直接输出可点击的知乎公开文章链接；只给本地日志或说“已发布”不满足交付。
 
 ## 能力边界
 
