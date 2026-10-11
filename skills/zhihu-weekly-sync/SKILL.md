@@ -1,13 +1,42 @@
 ---
 name: zhihu-weekly-sync
-description: 使用 zh_mcp_server 将用户拥有或获授权的周报素材发布到知乎，完成账号核对、草稿预览、发布和结果验证；需要从知乎转出内容时也用于判断上游能力边界。
+description: 在用户要求把获授权的周报发布到知乎文章/专栏、或需要判断知乎来源读取能力时使用，尤其适用于 Playwright 持久化登录态和发布结果校验。
 ---
 
 # 知乎周报同步
 
 本 skill 是知乎发布端适配器：把经核验的周报素材发布为知乎文章。素材可以来自 B 站、微博或用户提供的知乎文章 URL；发布授权来自当前任务，目标账号必须在发布前核对。
 
-## 前置依赖：安装知乎 MCP
+## 默认发布适配器：Playwright 持久化 profile
+
+跨平台周报发布默认使用 [yangming0506/zhihu-auto-publish](https://github.com/yangming0506/zhihu-auto-publish)，而不是把旧 MCP 的 Cookie 文件当作通用登录态：
+
+```bash
+git clone https://github.com/yangming0506/zhihu-auto-publish.git <private-workdir>/zhihu-auto-publish
+cd <private-workdir>/zhihu-auto-publish
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+npm install --no-audit --no-fund
+```
+
+先在 `~/.openclaw/browser-profiles/zhihu` 手动登录，并确认能看到知乎写作页；关闭这个手动 Chrome 后再让 Playwright 接管同一 profile。登录检查必须同时满足写作页元素可见和有效 `z_c0`，仅查询到 Cookie 名称不代表登录有效；如果截图显示登录页，立即停止，不填正文、不点击发布。
+
+统一素材清单转换为临时 JSON（至少含 `title`、`body`、`history_title`，正文末尾保留来源 URL），从已有素材直接运行：
+
+```bash
+AUTO_HOT_DEBUG=1 \
+MATRIX_PUBLISH_ARTICLE_JSON=<private-material-dir>/zhihu-article.json \
+MATRIX_PUBLISH_ONLY=zhihu \
+PLAYWRIGHT_HEADLESS=1 \
+ENABLE_BROWSER_PUBLISH=1 \
+.venv/bin/python main.py
+```
+
+不要在搬运周报时启用热点抓取、DeepSeek 成文或重新访问 B 站；`AUTO_HOT_DEBUG=1` 在这里的作用是允许加载已有 JSON。脚本会填充正文、点击发布并检查成功提示/`zhuanlan.zhihu.com/p/` URL。结果未知时先查作者文章列表或公开 URL，不要直接重试。
+
+当前适配器默认 `skip_cover: true`，适合周报正文版；知乎端最多单独指定一张封面，不能声称 40 张微博/B站配图已经全部上传。平台格式适配造成的图片省略必须写入回执。
+
+## 兼容方案：安装知乎 MCP
 
 使用上游项目 [Victorzwx/zh_mcp_server](https://github.com/Victorzwx/zh_mcp_server)：
 
@@ -38,9 +67,10 @@ python -m zh_mcp_server.__login__
 ## 工作流
 
 1. 接收统一素材清单，核对标题、正文、图片顺序、署名、来源链接和目标知乎账号；标题和正文未确认时只生成预览。
-2. 先用知乎浏览器会话或上游服务确认当前登录账号，再调用上游工具。工具名沿用项目当前的拼写 `create_atticle`，参数为 `title`、`content`、可选 `images` 和 `topic`。
-3. 由于当前上游发布接口只支持一个封面图片参数，正文中的多图应先按目标格式整理；不能声称所有原图都已作为知乎正文图片上传。若素材要求保留全量图片，先报告能力限制并等待目标格式确认。
-4. 发布后回读知乎文章 URL、标题、作者和封面；无法取得公开 URL 或账号不匹配时，不把提交响应单独当作成功。
+2. 先用与发布器相同的持久化 profile 确认当前登录账号，再调用发布器。不要用 Cookie 文件名、profile 名或用户口头描述推断账号。
+3. 如使用旧 MCP，工具名沿用项目当前的拼写 `create_atticle`，参数为 `title`、`content`、可选 `images` 和 `topic`；它的 Cookie 文件与 Playwright profile 不互通。
+4. 由于当前发布适配器不保证正文全量配图，先按目标格式整理；不能声称所有原图都已作为知乎正文图片上传。若素材要求保留全量图片，先报告能力限制并等待目标格式确认。
+5. 发布后回读知乎文章 URL、标题、作者和封面；无法取得公开 URL、页面仍为登录页或账号不匹配时，不把提交响应单独当作成功。
 
 ## 能力边界
 
@@ -48,4 +78,4 @@ python -m zh_mcp_server.__login__
 
 ## 去重与核验
 
-以来源平台、来源内容 ID、目标知乎账号组成去重键；先查仓库外回执和目标账号文章列表，再决定发布或回读。回执记录标题、来源 URL、目标账号、文章 URL、封面状态和核验时间，不记录 Cookie 或令牌。
+以来源平台、来源内容 ID、目标知乎账号组成去重键；先查仓库外回执和目标账号文章列表，再决定发布或回读。回执记录标题、来源 URL、目标账号、文章 URL、封面状态和核验时间，不记录 Cookie 或令牌。跨平台任务只消费已有 manifest，不重新抓取来源；一端已成功时，知乎失败只重跑知乎。
