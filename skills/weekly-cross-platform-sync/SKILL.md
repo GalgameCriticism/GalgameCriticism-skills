@@ -21,14 +21,14 @@ description: 管理 B 站、微博、知乎和小黑盒之间的周报同步工�
 | 目标 | 默认适配器 | 重要边界 |
 | --- | --- | --- |
 | 微博头条文章 | [XinAloha/skills](https://github.com/XinAloha/skills/tree/main/content/post-to-weibo) | Markdown 可填充正文和本地图片；需独立 Chrome profile，组合完成后再核对并点击“发布” |
-| 知乎文章 | [yangming0506/zhihu-auto-publish](https://github.com/yangming0506/zhihu-auto-publish) | 使用 Playwright 持久化 profile；发布前必须验证有效 `z_c0` 和写作页，默认正文版不上传全量配图 |
+| 知乎文章 | [guoxiaoyi/liduma-article-publisher](https://github.com/guoxiaoyi/liduma-article-publisher) | 使用 agent-browser 持久化 profile；含图周报必须导入带嵌图的 DOCX，发布后核对公开文章正文图片数量，不得降级成 Markdown 纯文本 |
 
 ## 执行顺序
 
 1. 解析用户指定的来源、目标平台、目标账号、社区/话题、是否允许直接发布，以及时间范围。
 2. 读取对应平台 skill 的安装和登录前置。缺 MCP、Cookie 未加载、登录页仍可见、账号不明或 profile 被占用时停在准备阶段；不把文件名或用户口头“已登录”当作账号证明。
 3. 调用来源 skill **只生成一次**仓库外的统一素材清单。清单至少包含 `source`、`source_id`、`canonical_url`、`title`、`blocks`、`images`、`author` 和 `published_at`；所有目标平台都从这份清单派生，不重新抓取来源。
-4. 为每个目标生成独立 payload，但保留同一 `source_id` 和素材版本。平台限制造成的标题截断、正文纯文本化或图片减少必须记录在 payload/回执中。
+4. 为每个目标生成独立 payload，但保留同一 `source_id` 和素材版本。标题截断必须记录在 payload/回执中；含图知乎周报不得接受正文纯文本化或图片减少作为静默降级，遇到平台限制时停在发布前。
 5. 预览并核对：正文是否完整、图片顺序是否一致、标题是否符合目标限制、来源署名是否保留、目标账号和社区/专栏是否正确。
 6. 用 `source + source_id + target_account + target_scope`，必要时加正文/图片指纹去重。已有回执、草稿或目标端同源文章时先回读验证，不重复发布。
 7. 按平台顺序发布，不并发重复点击。发布响应、管理列表或目标公开页面三者至少形成一条证据链；超时或结果未知时先查询，不直接重试。
@@ -39,19 +39,19 @@ description: 管理 B 站、微博、知乎和小黑盒之间的周报同步工�
 一次来源采集应产生不可变的 `manifest.json`、`preview.md` 和图片目录。目标端只允许做平台适配，不得再次访问 B 站/微博抓取同一周报。
 
 - 图片以 manifest 顺序为准，使用本地路径和来源 URL 双记录；上传失败只重试失败图片。
-- 微博头条文章可以复用 Markdown 和全部本地图片；知乎当前适配器以正文版为主，最多单独指定一张封面，不能声称全量图片已上传。
+- 微博头条文章可以复用 Markdown 和全部本地图片；知乎含图文章必须复用同一 manifest 生成嵌图 DOCX，并在编辑器和公开页核对图片数量。知乎封面最多单独指定一张，封面缺失不能冒充正文图片已上传。
 - 一个平台成功、另一个失败时，只处理失败平台；不删除或重复发布已成功平台。
 
 ## 账号切换规则
 
-账号是每次任务的显式输入。小黑盒通过 `XIAOHEIHE_COOKIE_PATH` 选择 Cookie；微博发布适配器使用独立 `~/.config/baoyu-skills/chrome-profile`；知乎发布适配器使用独立 `~/.openclaw/browser-profiles/zhihu`。切换账号后重新登录并运行实际登录检查：知乎同时要求写作页可见和有效 `z_c0`，微博要求首页/文章编辑器显示目标昵称。profile 被手动 Chrome 占用时，只关闭对应路径的专用窗口，不能杀掉普通 Chrome 或其他账号窗口。
+账号是每次任务的显式输入。小黑盒通过 `XIAOHEIHE_COOKIE_PATH` 选择 Cookie；微博发布适配器使用独立 `~/.config/baoyu-skills/chrome-profile`；知乎发布适配器使用 `LIDUMA_AGENT_BROWSER_PROFILE` 指向的独立 profile。切换账号后重新登录并运行实际登录检查：知乎要求写作页可见，发布前后还要核对目标作者；微博要求首页/文章编辑器显示目标昵称。profile 被手动 Chrome 占用时，只关闭对应路径的专用窗口，不能杀掉普通 Chrome 或其他账号窗口。
 
 ## 安装总览
 
 - 小黑盒：安装 [GalgameCriticism/XiaoheiheMcpServer](https://github.com/GalgameCriticism/XiaoheiheMcpServer) 并构建 `XiaoheiheMcpServer.Stdio`。
 - 微博来源读取：`uv tool install mcp-server-weibo`，配置 `uvx --from mcp-server-weibo mcp-server-weibo`；该项目不是微博写入器。
 - 微博发布：安装 [XinAloha/skills](https://github.com/XinAloha/skills) 中的 `content/post-to-weibo/scripts`，执行 `npm install`，运行时使用 `npx -y bun weibo-article.ts <preview.md> --profile <private-profile>`。
-- 知乎发布：安装 [yangming0506/zhihu-auto-publish](https://github.com/yangming0506/zhihu-auto-publish) 的 Python/Node 依赖，使用 `MATRIX_PUBLISH_ARTICLE_JSON` 和 `AUTO_HOT_DEBUG=1` 直接发布已核验素材；不要为搬运周报启用其热点抓取或 LLM 生成分支。
+- 知乎发布：安装 [guoxiaoyi/liduma-article-publisher](https://github.com/guoxiaoyi/liduma-article-publisher) 与 `agent-browser`，用已有 manifest 生成临时 DOCX/封面目录，先运行 `--check-login --platform=zhihu`，再运行 `--publish --platform=zhihu`；发布后回读公开页。此前的 [yangming0506/zhihu-auto-publish](https://github.com/yangming0506/zhihu-auto-publish) 仅作为备用探索适配器，若它重定向登录页或只打印“完成”而没有公开 URL，立即判失败并切换。
 
 旧的 [Victorzwx/zh_mcp_server](https://github.com/Victorzwx/zh_mcp_server) 保留为兼容/探索方案；它的 Cookie 文件和 Selenium 流程不自动复用上述 Playwright profile。
 
