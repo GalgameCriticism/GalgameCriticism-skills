@@ -17,7 +17,7 @@
 
 ```bash
 python /path/to/skill-installer/scripts/install-skill-from-github.py \
-  --repo GalgameCriticism/skills \
+  --repo GalgameCriticism/GalgameCriticism-skills \
   --path skills/weekly-cross-platform-sync
 ```
 
