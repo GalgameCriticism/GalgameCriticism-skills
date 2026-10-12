@@ -1,0 +1,4 @@
+interface:
+  display_name: "B站周报图文排版"
+  short_description: "把docx文字稿和图包排版成B站图文专栏，人工审核后发布并回读验证"
+  default_prompt: "使用 $bilibili-weekly-article 把指定期目录的文字稿docx和图包排版成B站图文，生成预览供我审核，我确认后发布到我的B站账号并给出公开链接。"

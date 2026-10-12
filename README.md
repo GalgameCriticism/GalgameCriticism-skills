@@ -6,6 +6,7 @@
 
 | Skill | 用途 |
 | --- | --- |
+| [bilibili-weekly-article](skills/bilibili-weekly-article/SKILL.md) | 把期目录 docx 文字稿与图包排版成 B 站图文（Opus），上传配图、生成预览供人工审核，存草稿或直接发布并回读；署名从飞书「周报工作表」按期号拉取 |
 | [xiaoheihe-weekly-sync](skills/xiaoheihe-weekly-sync/SKILL.md) | 定位指定期号或最新 B 站周报，保留图文，按文章类型去重，核对小黑盒账号及社区后发布并回读 |
 | [weibo-weekly-sync](skills/weibo-weekly-sync/SKILL.md) | 获取获授权微博周报，或将统一素材发布为微博头条文章，处理真实图片校验与失败恢复 |
 | [zhihu-weekly-sync](skills/zhihu-weekly-sync/SKILL.md) | 连接独立会话，以嵌图 DOCX 发布知乎周报，核验全文和图片顺序 |
@@ -21,7 +22,7 @@ python /path/to/skill-installer/scripts/install-skill-from-github.py \
   --path skills/weekly-cross-platform-sync
 ```
 
-总工作流会按任务需要调用 `xiaoheihe-weekly-sync`、`weibo-weekly-sync`、`zhihu-weekly-sync` 和对应的目标发布适配器；也可以直接安装其中任意一个独立 skill。
+总工作流分两段：`bilibili-weekly-article` 负责把期目录素材排版成 B 站图文（人工审核后发布，是搬运链路的内容源头）；`weekly-cross-platform-sync` 统一路由，按任务需要调用 `xiaoheihe-weekly-sync`、`weibo-weekly-sync`、`zhihu-weekly-sync` 和对应的目标发布适配器。也可以直接安装其中任意一个独立 skill。
 
 辅助脚本的依赖写在各自的 SKILL.md 中。账号信息、Cookie 文件、下载的原文与运行记录保留在使用者本机，运行时传入。
 
