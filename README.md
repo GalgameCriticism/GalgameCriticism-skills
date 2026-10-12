@@ -12,6 +12,44 @@
 | [zhihu-weekly-sync](skills/zhihu-weekly-sync/SKILL.md) | 连接独立会话，以嵌图 DOCX 发布知乎周报，核验全文和图片顺序 |
 | [weekly-cross-platform-sync](skills/weekly-cross-platform-sync/SKILL.md) | 统一路由来源与目标平台，管理安装、账号核对、素材清单、去重和回执 |
 
+## 标准生产链路
+
+周报从原始素材到全平台分发分两段，中间以「人工审核并手动发布」为界：
+
+```text
+期目录（docx「去注音」稿 + 图包素材 + 封面）
+      │
+      ▼
+┌───────────────────────────────────────────┐
+│ bilibili-weekly-article（B 站图文生产端）  │
+│  解析素材 → 飞书拉取署名 → 上传配图        │
+│  → 本地预览 → 提交 B 站草稿                │
+└───────────────────────────────────────────┘
+      │  草稿箱（article_id 回执）
+      ▼
+   ✋ 人工审核：核对版式、配图与署名，
+      在 B 站编辑器手动点击「发布」
+      │
+      ▼
+   已发布的 B 站周报图文（cv 号 / 公开链接）
+      │
+      ▼
+┌───────────────────────────────────────────┐
+│ weekly-cross-platform-sync（跨平台编排）   │
+│  按期号 / cv 号定位已发布图文，            │
+│  采集一次不可变素材清单后分发              │
+└───────────────────────────────────────────┘
+      ├──▶ xiaoheihe-weekly-sync ──▶ 小黑盒
+      ├──▶ zhihu-weekly-sync     ──▶ 知乎
+      └──▶ weibo-weekly-sync     ──▶ 微博
+```
+
+三条约定：
+
+1. **B 站是首发平台**：生产端只把周报做成 B 站草稿，「发布」由人工在审核后手动完成，技能不代发；
+2. **搬运的输入是已发布的图文**：各平台 skill 从 B 站公开页读取内容，必须等 B 站发布完成后才能启动 `weekly-cross-platform-sync`；以发布回执和公开页为准，不重新解析本地素材；
+3. **两段可独立使用**：只有 docx 和素材时用 `bilibili-weekly-article`；已有 B 站 cv 号时直接用对应搬运 skill，无需经过生产端。
+
 ## 安装
 
 将需要的 skill 文件夹放入客户端的 skills 目录，或在支持 GitHub 安装的客户端中指定本仓库及 `skills/<skill-name>` 路径。支持 OpenAI skill-installer 的环境可以使用：
@@ -22,7 +60,7 @@ python /path/to/skill-installer/scripts/install-skill-from-github.py \
   --path skills/weekly-cross-platform-sync
 ```
 
-总工作流分两段：`bilibili-weekly-article` 负责把期目录素材排版成 B 站图文（人工审核后发布，是搬运链路的内容源头）；`weekly-cross-platform-sync` 统一路由，按任务需要调用 `xiaoheihe-weekly-sync`、`weibo-weekly-sync`、`zhihu-weekly-sync` 和对应的目标发布适配器。也可以直接安装其中任意一个独立 skill。
+完整链路见上方[标准生产链路](#标准生产链路)：`bilibili-weekly-article` 产出 B 站草稿，经人工审核发布后，`weekly-cross-platform-sync` 再按任务需要调用 `xiaoheihe-weekly-sync`、`weibo-weekly-sync`、`zhihu-weekly-sync` 和对应的目标发布适配器。也可以直接安装其中任意一个独立 skill。
 
 辅助脚本的依赖写在各自的 SKILL.md 中。账号信息、Cookie 文件、下载的原文与运行记录保留在使用者本机，运行时传入。
 
