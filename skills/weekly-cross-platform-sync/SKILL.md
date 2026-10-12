@@ -11,7 +11,7 @@ description: 管理 B 站、微博、知乎和小黑盒之间的周报同步工�
 
 | 来源 | 目标 | 使用的 skill |
 | --- | --- | --- |
-| B 站文集 | 小黑盒 | [bilibili-xiaoheihe-weekly](../bilibili-xiaoheihe-weekly/SKILL.md) |
+| B 站文集 | 小黑盒 | [xiaoheihe-weekly-sync](../xiaoheihe-weekly-sync/SKILL.md) |
 | 微博动态/周报 | 小黑盒或其他目标 | [weibo-weekly-sync](../weibo-weekly-sync/SKILL.md) + 对应目标 skill |
 | B 站或微博素材 | 知乎文章 | [zhihu-weekly-sync](../zhihu-weekly-sync/SKILL.md) |
 | 知乎文章 | 其他目标 | [zhihu-weekly-sync](../zhihu-weekly-sync/SKILL.md) 先做能力检查；必要时要求 URL/正文或另接读取适配器 |

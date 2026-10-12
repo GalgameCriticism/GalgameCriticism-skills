@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 REPO = Path(__file__).resolve().parents[1]
-spec = importlib.util.spec_from_file_location('fetch', REPO / 'skills/bilibili-xiaoheihe-weekly/scripts/fetch_weekly.py')
+spec = importlib.util.spec_from_file_location('fetch', REPO / 'skills/xiaoheihe-weekly-sync/scripts/fetch_weekly.py')
 fetch = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(fetch)
 

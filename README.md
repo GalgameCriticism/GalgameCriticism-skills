@@ -6,7 +6,7 @@
 
 | Skill | 用途 |
 | --- | --- |
-| [bilibili-xiaoheihe-weekly](skills/bilibili-xiaoheihe-weekly/SKILL.md) | 定位指定期号或最新 B 站周报，保留图文，按文章类型去重，核对小黑盒账号及社区后发布并回读 |
+| [xiaoheihe-weekly-sync](skills/xiaoheihe-weekly-sync/SKILL.md) | 定位指定期号或最新 B 站周报，保留图文，按文章类型去重，核对小黑盒账号及社区后发布并回读 |
 | [weibo-weekly-sync](skills/weibo-weekly-sync/SKILL.md) | 获取获授权微博周报，或将统一素材发布为微博头条文章，处理真实图片校验与失败恢复 |
 | [zhihu-weekly-sync](skills/zhihu-weekly-sync/SKILL.md) | 连接独立会话，以嵌图 DOCX 发布知乎周报，核验全文和图片顺序 |
 | [weekly-cross-platform-sync](skills/weekly-cross-platform-sync/SKILL.md) | 统一路由来源与目标平台，管理安装、账号核对、素材清单、去重和回执 |
@@ -21,7 +21,7 @@ python /path/to/skill-installer/scripts/install-skill-from-github.py \
   --path skills/weekly-cross-platform-sync
 ```
 
-总工作流会按任务需要调用 `bilibili-xiaoheihe-weekly`、`weibo-weekly-sync`、`zhihu-weekly-sync` 和对应的目标发布适配器；也可以直接安装其中任意一个独立 skill。
+总工作流会按任务需要调用 `xiaoheihe-weekly-sync`、`weibo-weekly-sync`、`zhihu-weekly-sync` 和对应的目标发布适配器；也可以直接安装其中任意一个独立 skill。
 
 辅助脚本的依赖写在各自的 SKILL.md 中。账号信息、Cookie 文件、下载的原文与运行记录保留在使用者本机，运行时传入。
 

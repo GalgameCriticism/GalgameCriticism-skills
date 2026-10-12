@@ -1,5 +1,5 @@
 ---
-name: bilibili-xiaoheihe-weekly
+name: xiaoheihe-weekly-sync
 description: 将用户拥有或获授权的 B 站指定期号或最新图文周报同步到指定小黑盒账号和社区。用户要求搬运周报、B站同步小黑盒或发布 Gal 周报时使用。
 ---
 

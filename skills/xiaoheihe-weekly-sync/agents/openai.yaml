@@ -1,0 +1,4 @@
+interface:
+  display_name: "B站周报同步小黑盒"
+  short_description: "提取指定期号或最新图文周报，核对账号及社区后发布并回读"
+  default_prompt: "使用 $xiaoheihe-weekly-sync 将 B 站指定期号或最新周报同步到我的小黑盒账号和社区，最终输出核验通过的公开帖子链接。"

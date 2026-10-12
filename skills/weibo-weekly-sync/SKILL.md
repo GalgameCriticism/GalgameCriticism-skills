@@ -38,7 +38,7 @@ stdio 配置示例：
 2. 用 `search_users` 解析并核对账号，再用 `get_feeds` 获取其最新动态。需要按关键词找文章时使用 `search_content`，必要时用 `get_comments`、`search_topics` 补齐上下文。
 3. 用户指定期号时精确定位该期，未指定时依据微博内容 ID 和发布时间选最新；不要把置顶、转发或纯广告误当周报。记录来源账号、内容 ID、发布时间和原始链接。
 4. 将正文、段落顺序、图片 URL/本地临时文件和署名写入仓库外的统一素材清单。图片按原顺序核对；抓取失败、权限限制或正文不完整时只输出准备失败，不发布残稿。
-5. 交给 `weekly-cross-platform-sync` 按目标平台执行预览、账号核对、发布和回读验证。目标为小黑盒时复用 [bilibili-xiaoheihe-weekly](../bilibili-xiaoheihe-weekly/SKILL.md) 中的目标端发布流程；不要在本 skill 复制小黑盒选择器。
+5. 交给 `weekly-cross-platform-sync` 按目标平台执行预览、账号核对、发布和回读验证。目标为小黑盒时复用 [xiaoheihe-weekly-sync](../xiaoheihe-weekly-sync/SKILL.md) 中的目标端发布流程；不要在本 skill 复制小黑盒选择器。
 
 ## 微博写入适配器
 
