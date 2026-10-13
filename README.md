@@ -6,11 +6,13 @@
 
 ## 技能目录
 
-- [bilibili-weekly-article](skills/bilibili-weekly-article/README.md)
-- [weekly-cross-platform-sync](skills/weekly-cross-platform-sync/README.md)
-- [xiaoheihe-weekly-sync](skills/xiaoheihe-weekly-sync/README.md)
-- [weibo-weekly-sync](skills/weibo-weekly-sync/README.md)
-- [zhihu-weekly-sync](skills/zhihu-weekly-sync/README.md)
+| Skill | 用途 |
+| --- | --- |
+| [bilibili-weekly-article](skills/bilibili-weekly-article/README.md) | 把期目录 docx 文字稿与图包排版成 B 站图文（Opus），上传配图、生成预览供人工审核，存草稿或直接发布并回读；署名从飞书「周报工作表」按期号拉取 |
+| [xiaoheihe-weekly-sync](skills/xiaoheihe-weekly-sync/README.md) | 定位指定期号或最新 B 站周报，保留图文，按文章类型去重，核对小黑盒账号及社区后发布并回读 |
+| [weibo-weekly-sync](skills/weibo-weekly-sync/README.md) | 获取获授权微博周报，或将统一素材发布为微博头条文章，处理真实图片校验与失败恢复 |
+| [zhihu-weekly-sync](skills/zhihu-weekly-sync/README.md) | 连接独立会话，以嵌图 DOCX 发布知乎周报，核验全文和图片顺序 |
+| [weekly-cross-platform-sync](skills/weekly-cross-platform-sync/README.md) | 统一路由来源与目标平台，管理安装、账号核对、素材清单、去重和回执 |
 
 ## 安装
 
@@ -26,4 +28,4 @@ python /path/to/skill-installer/scripts/install-skill-from-github.py \
 
 ## 增加技能
 
-新建 `skills/<lowercase-hyphenated-name>/`，包含 `SKILL.md`（frontmatter 的 `name` / `description` 正确）与至少一句定位的 `README.md`，按实际需要添加 `scripts/`、`references/`、`agents/`；**同步更新上方技能目录**。其余约定（根 README 不放具体介绍、提交前脱敏自检、发布与浏览器行为）见 [AGENTS.md](AGENTS.md)。
+新建 `skills/<lowercase-hyphenated-name>/`，包含 `SKILL.md`（frontmatter 的 `name` / `description` 正确）与至少一句定位的 `README.md`，按实际需要添加 `scripts/`、`references/`、`agents/`；**同步更新上方技能目录表格（加一行）**。其余约定（目录口径、提交前脱敏自检、发布与浏览器行为）见 [AGENTS.md](AGENTS.md)。

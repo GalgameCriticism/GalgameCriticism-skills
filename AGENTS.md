@@ -8,14 +8,14 @@ GalgameCriticism 团队共用的 Agent Skills 仓库，会容纳各种各样的 
 
 ## 根 README 规则（强制）
 
-1. **不放具体 skill 的介绍**：根 README 的「技能目录」只列 skill 名字与链接（指向该 skill 的 `README.md`），不写用途描述、工作流或业务流程。
+1. **不放具体 skill 的长篇介绍**：根 README 的「技能目录」用表格维护，每行一句话用途描述 + 链接（指向该 skill 的 `README.md`）；工作流、流程图、平台细节等详细内容一律放 skill 自己的 `README.md`，根 README 不出现。
 2. **具体内容下沉**：某 skill 的用途介绍、工作流、流程图等，放到 `skills/<name>/README.md`（面向人，讲「这是什么」）；agent 的执行说明与 frontmatter 仍在 `skills/<name>/SKILL.md`（面向 agent，讲「怎么执行」）。
 3. **目录同步**：每次新增、重命名或删除 skill，提交前必须同步更新根 README 的技能目录，使目录与 `ls skills/` 一致；新 skill 必须自带 `README.md`（至少一句定位 + 指向 SKILL.md）。
 
 ## 提交前自检
 
 - 根 README 技能目录与 `skills/` 实际目录一致（不多、不少、名字相同）；
-- 根 README 中没有具体 skill 的介绍、业务流程或平台细节；
+- 根 README 除技能目录表格的一句话用途外，没有工作流、业务流程或平台细节；
 - 仓库根不放 skill 相关的散装文件：脚本、**测试**、素材等一律放对应 `skills/<name>/` 内（测试习惯放 `skills/<name>/tests/`），仓库根只保留 `README.md`、`AGENTS.md`、`.gitignore`；
 - 新 skill 自带 `README.md`，且 `SKILL.md` frontmatter 的 `name` / `description` 正确；
 - 未提交任何成员的用户名路径、令牌、Cookie、浏览器配置目录或运行产物——提交前对新增文件做凭证与个人路径脱敏扫描。
