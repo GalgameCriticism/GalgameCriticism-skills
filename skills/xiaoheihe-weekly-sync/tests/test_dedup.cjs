@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const mod = require('../skills/xiaoheihe-weekly-sync/scripts/publish_weekly.cjs');
+const mod = require('../scripts/publish_weekly.cjs');
 assert.equal(typeof mod.isArticleDuplicate, 'function', 'Content-type-aware article deduplication is missing');
 assert.equal(mod.isArticleDuplicate([{title:'周报12期', type:'视频'}], '周报12期'), false);
 assert.equal(mod.isArticleDuplicate([{title:'周报12期', type:'文章'}], '周报12期'), true);

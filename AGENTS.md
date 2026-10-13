@@ -16,6 +16,7 @@ GalgameCriticism 团队共用的 Agent Skills 仓库，会容纳各种各样的 
 
 - 根 README 技能目录与 `skills/` 实际目录一致（不多、不少、名字相同）；
 - 根 README 中没有具体 skill 的介绍、业务流程或平台细节；
+- 仓库根不放 skill 相关的散装文件：脚本、**测试**、素材等一律放对应 `skills/<name>/` 内（测试习惯放 `skills/<name>/tests/`），仓库根只保留 `README.md`、`AGENTS.md`、`.gitignore`；
 - 新 skill 自带 `README.md`，且 `SKILL.md` frontmatter 的 `name` / `description` 正确；
 - 未提交任何成员的用户名路径、令牌、Cookie、浏览器配置目录或运行产物——提交前对新增文件做凭证与个人路径脱敏扫描。
 
