@@ -48,6 +48,25 @@ stdio 配置示例：
 
 `scripts/browser-session.cjs` 的 `attach(profileDir, port)` 先 `connectOverCDP` 连接已在运行的专用 Chrome，只有探测不到调试端口时才启动一次（`--no-sandbox --remote-debugging-port=<port>`，detached）。微博默认端口 `9333`（`CHROME_DEBUG_PORT` 可覆盖），与知乎的 `9444` 分开。每步结束都不关窗口，下一步重新 `attach`。
 
+### 脚本入口（推荐一次跑完，不要拆成多个 node 进程）
+
+```bash
+# 编排 + 校验 + 发布，同一个进程、同一个窗口
+node skills/weibo-weekly-sync/scripts/weibo-run.cjs \
+  --manifest <payload>/manifest.json --optimized <payload>/images-opt --publish
+
+# 只编排不发布（--publish 去掉即可），之后单独收尾/发布
+node skills/weibo-weekly-sync/scripts/weibo-finalize.cjs --manifest <payload>/manifest.json
+
+# 公开页回读
+node skills/weibo-weekly-sync/scripts/weibo-verify.cjs --url https://weibo.com/ttarticle/p/show?id=...
+
+# 登录态失效时复用同一窗口等扫码
+node skills/weibo-weekly-sync/scripts/weibo-login.cjs
+```
+
+拆成多个进程时，跨进程 `connectOverCDP` 在本机会出现脚本被 SIGTERM（退出码 137）且无输出的情况；`weibo-run.cjs` 因此把编排、校验、发布、取公开链接串在同一个 `async` 里，窗口只开一次。结束时只 `log({ step: 'browser_left_open' })`，不 `close()`。
+
 ### 不要用上游适配器自带的启动器
 
 `XinAloha/skills` 的 `weibo-article.ts` 内容编排可参考，但它通过 `baoyu-chrome-cdp` 启动 Chrome 时**不带 `--no-sandbox`**，在受限环境下 Chrome 直接退出，表现为 `Error: CDP connection closed.`。改用 `scripts/weibo-compose.cjs`（Playwright 直排），只保留“标题/导语/正文/图片”的编排思路。

@@ -20,6 +20,26 @@ const account = process.env.WEIBO_ACCOUNT || 'Galgame批评';
 const log = o => console.log(JSON.stringify({ t: new Date().toISOString(), ...(typeof o === 'string' ? { msg: o } : o) }));
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
+// The draft id in `#/history/<draftId>` is NOT the article id. The only reliable way to the
+// public URL is the account timeline: the newest "发布了头条文章" card carries page_info.page_url.
+const WEIBO_UID = process.env.WEIBO_UID || '7615845670';
+async function findArticleUrl() {
+  for (let i = 0; i < 10; i++) {
+    try {
+      const r = await fetch(`https://m.weibo.cn/api/container/getIndex?type=uid&value=${WEIBO_UID}&containerid=107603${WEIBO_UID}`, {
+        headers: { 'user-agent': 'Mozilla/5.0', referer: `https://m.weibo.cn/u/${WEIBO_UID}` },
+      });
+      const j = await r.json();
+      for (const card of (j && j.data && j.data.cards) || []) {
+        const url = card && card.mblog && card.mblog.page_info && card.mblog.page_info.page_url;
+        if (url && /ttarticle/.test(url)) return url;
+      }
+    } catch { /* timeline API is flaky right after publishing; retry */ }
+    await sleep(15000);
+  }
+  return null;
+}
+
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const marks = node => {
   let h = esc(node.text);
@@ -198,31 +218,21 @@ const tokenRect = (page, n) => page.evaluate(idx => {
   if (!args.publish) {
     fs.writeFileSync(receiptFile, JSON.stringify({ ...state, status: 'prepared' }, null, 2));
     log({ step: 'prepared' });
-    await ctx.browser().close();
+    log({ step: 'browser_left_open', url: page.url() });
     return;
   }
   if (!textOk || s.hosted !== expectedImages || s.placeholders !== 0) throw new Error('Fidelity gate failed; not publishing');
 
   fs.writeFileSync(receiptFile, JSON.stringify({ ...state, status: 'submitting' }, null, 2));
 
-  // v5 renders the publish settings inline; the 下一步 control is often a div, so click through the DOM.
-  const clickByText = (label) => page.evaluate(l => {
-    const cands = [...document.querySelectorAll('button, [role="button"], div, span, a')]
-      .filter(e => e.textContent.trim() === l && e.children.length === 0);
-    const el = cands.pop();
-    if (!el) return false;
-    (el.closest('button') || el).click();
-    return true;
-  }, label);
+  // 1. 下一步 must be a real locator click. A DOM click on the footer control logs ok:true and does nothing.
+  await page.locator('button:has-text("下一步")').first().click({ timeout: 20000 });
+  await sleep(5000);
 
-  log({ step: 'next_clicked', ok: await clickByText('下一步') });
-  await sleep(6000);
-  log({ step: 'settings', url: page.url() });
+  // 2. The publish settings are NOT inline in v5 — they open as a modal (`31 | 公开 | 发布`).
+  const modal = page.locator('.n-modal, [role="dialog"]').filter({ hasText: '发布' }).first();
+  log({ step: 'settings_modal', found: await modal.count(), url: page.url() });
   await page.screenshot({ path: path.join(payloadDir, 'weibo-settings.png') });
-  log({ step: 'settings_ui', ...(await page.evaluate(() => ({
-    buttons: [...document.querySelectorAll('button')].map(b => b.textContent.trim()).filter(Boolean).slice(0, 40),
-    modals: [...document.querySelectorAll('[class*="modal"], [class*="Modal"], [class*="dialog"]')].map(m => m.innerText.slice(0, 100)).slice(0, 3),
-  }))) });
 
   if (args.cover) {
     const coverEntry = page.getByText('设置封面', { exact: false }).first();
@@ -238,24 +248,40 @@ const tokenRect = (page, n) => page.evaluate(idx => {
     }
   }
 
-  log({ step: 'publish_clicked', ok: await clickByText('发布') });
-  await sleep(4000);
-  // confirmation dialog
-  const confirmed = await page.evaluate(() => {
-    const dlg = [...document.querySelectorAll('[class*="modal"] button, [class*="dialog"] button, .woo-dialog button')]
-      .filter(b => /发布|确认/.test(b.textContent.trim()));
-    if (!dlg.length) return false;
-    dlg[dlg.length - 1].click();
+  // 3. `.n-modal-mask` has aria-hidden and swallows pointer events, so a Playwright click retries forever.
+  //    A DOM click on the modal's own 发布 button bypasses hit-testing and is the verified path.
+  const clicked = await page.evaluate(() => {
+    const btn = [...document.querySelectorAll('button')].filter(b => b.textContent.trim() === '发布').pop();
+    if (!btn) return false;
+    btn.click();
     return true;
   });
-  log({ step: 'confirm', clicked: confirmed });
+  log({ step: 'publish_clicked', ok: clicked });
+  if (!clicked) throw new Error('publish button missing after 下一步');
 
+  // 4. Success is the SPA landing on #/history/<draftId> — it never redirects to a public article URL.
+  let draftId = null;
   for (let i = 0; i < 45; i++) {
     await sleep(2000);
-    if (/ttarticle\/p\/show/.test(page.url())) break;
+    const m = page.url().match(/#\/history\/(\d+)/);
+    if (m) { draftId = m[1]; break; }
   }
-  log({ step: 'after_publish', url: page.url() });
+  log({ step: 'after_publish', url: page.url(), draftId });
   await page.screenshot({ path: path.join(payloadDir, 'weibo-published.png') });
-  fs.writeFileSync(receiptFile, JSON.stringify({ ...state, status: /ttarticle\/p\/show/.test(page.url()) ? 'published' : 'unknown', afterUrl: page.url() }, null, 2));
-  await ctx.browser().close();
+
+  // 5. Resolve the real article URL from the timeline.
+  const publicUrl = draftId ? await findArticleUrl() : null;
+  log({ step: 'public_url', url: publicUrl });
+
+  fs.writeFileSync(receiptFile, JSON.stringify({
+    ...state,
+    status: draftId ? (publicUrl ? 'published' : 'published_url_unknown') : 'unknown',
+    draftId,
+    afterUrl: page.url(),
+    publicUrl,
+    at: new Date().toISOString(),
+  }, null, 2));
+
+  // 6. Leave the window open — closing it is what forced a relaunch on every later step.
+  log({ step: 'browser_left_open', url: page.url() });
 })().catch(e => { console.error('ERR', e && e.message); process.exit(1); });
