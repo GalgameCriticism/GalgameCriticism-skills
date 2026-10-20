@@ -42,23 +42,31 @@ stdio 配置示例：
 
 ## 微博写入适配器
 
-`qinyuanpei/mcp-server-weibo` 当前是读取适配器，不能冒充微博发布器。需要写入微博时使用已验证的 [XinAloha/skills](https://github.com/XinAloha/skills/tree/main/content/post-to-weibo)：
+`qinyuanpei/mcp-server-weibo` 当前是读取适配器，不能冒充微博发布器。
 
-```bash
-git clone https://github.com/XinAloha/skills.git <private-workdir>/xinaloha-skills
-cd <private-workdir>/xinaloha-skills/content/post-to-weibo/scripts
-npm install --no-audit --no-fund
-npx -y bun weibo-article.ts <private-material-dir>/preview.md \
-  --profile <private-profile>/baoyu-skills/chrome-profile
-```
+### 一个窗口贯穿全流程（不要反复重启浏览器）
 
-首次使用由用户在独立 profile 中手动登录微博。连接与恢复遵守 [共享浏览器会话规则](../weekly-cross-platform-sync/references/browser-session.md)：优先连接既有专用 CDP；用户明确允许自动启动且原专用 profile 无进程占用时，可启动同一 profile，不重置、不关闭用户窗口、不换密码存储后端。有现成草稿时复用它，不再调用会另开浏览器的 CLI。脚本会填充头条文章，发布步骤仍须执行。
+`scripts/browser-session.cjs` 的 `attach(profileDir, port)` 先 `connectOverCDP` 连接已在运行的专用 Chrome，只有探测不到调试端口时才启动一次（`--no-sandbox --remote-debugging-port=<port>`，detached）。微博默认端口 `9333`（`CHROME_DEBUG_PORT` 可覆盖），与知乎的 `9444` 分开。每步结束都不关窗口，下一步重新 `attach`。
 
-发布前必须验证：标题不超过 32 字、导语不超过 44 字、正文图片数与 manifest 一致、没有 `WBIMGPH_` 占位符、页面显示目标昵称。用户已授权直接发布时，再点击编辑器中精确匹配的“发布”按钮，禁止点击“保存草稿”；捕获 `draft/publish` 响应并核对成功码后，访问返回的 `https://weibo.com/ttarticle/p/show?id=...` 公开地址验证标题和正文。
+### 不要用上游适配器自带的启动器
 
-含多图、出现上传失败或需要发布封面/公开页核验时，先阅读 [头条文章上传与恢复](references/article-publishing.md)。每张图须有真实托管 URL 和成功终态；本地 `blob:`、HTTP 200 或普通 `img` 计数均不能证明成功。上传成功项立即缓存，只修复失败项，避免整篇重复上传。
+`XinAloha/skills` 的 `weibo-article.ts` 内容编排可参考，但它通过 `baoyu-chrome-cdp` 启动 Chrome 时**不带 `--no-sandbox`**，在受限环境下 Chrome 直接退出，表现为 `Error: CDP connection closed.`。改用 `scripts/weibo-compose.cjs`（Playwright 直排），只保留“标题/导语/正文/图片”的编排思路。
 
-适配器应按 manifest 中的图片清单处理多图；页面会把 ProseMirror 分隔图也计入普通 `img` 数量，验证应统计 `.image-view__body__image` 和占位符，不要仅看 `img` 总数。若平台必须改用普通微博，使用 [CoPaw weibo_publish](https://github.com/reboasda-ship-it/copaw_skills/tree/main/weibo_publish) 时遵守其每条最多 9 张图、2000 字和默认 5 分钟间隔，并将拆分结果记录为独立 payload。
+### 编辑器结构与直排做法（v5，tiptap/ProseMirror）
+
+- 入口 `https://card.weibo.com/article/v3/editor`，已有草稿时 URL 形如 `#/draft/<id>`；有“写文章”按钮就先点它。
+- 身份核对：编辑器壳层会渲染登录账号昵称，必须等于 `Galgame批评`。**不要**用 `weibo.com` 首页判断登录态：未登录也会先渲染首页再跳 `newlogin`，DOM 不可靠。
+- 标题 `input[placeholder*="请输入标题"]`（32 字上限，超出截断），导语 `[placeholder*="导语"]`（44 字上限）。
+- 正文：向 `.ProseMirror` 派发带 `text/html` 的 `ClipboardEvent('paste')`，图片位置先写成 `WBIMGPH_<n>` 文本占位。
+- 图片：逐个定位占位文本、用 `Range` 选中，再派发携带 `File` 的 `ClipboardEvent('paste')`。成功后出现 `figure.wb-node-image`，上传中带 `image-view__body--uploading`，完成后 `figure img` 的 `src` 变为 `https://wx*.sinaimg.cn/...`。
+- 校验：`figure` 数 = manifest 图片数；所有 `src` 为 `http(s)` 且不是 `r.sinaimg.cn/images/tc2.service.jpg`（编辑器占位图，实测会出现）；正文无 `WBIMGPH_` 残留；归一化全文与 manifest 一致。
+- 发布：v5 编辑器底部是“下一步”→ 发布设置页 → “发布”。捕获 `draft/publish` 响应并核对成功码，再回读 `https://weibo.com/ttarticle/p/show?id=...` 验证标题、作者、正文与图片。
+- 封面：发布设置页“设置封面”上传本期封面，不复用上一篇。
+
+### 登录态失效时
+
+Cookie 丢失时编辑器与首页都会 302 到 `newlogin`。用 `scripts/weibo-login.cjs` 复用同一个窗口停在登录页等用户扫码（默认 10 分钟，`WEIBO_LOGIN_WAIT_MIN` 可调），扫码完成后脚本只输出昵称、不关窗口。绝不为“重置登录态”删除 profile 或 `Singleton*` 文件——那会直接清掉已登录 Cookie，必须让用户重新扫码。
+
 
 ## 去重与核验
 

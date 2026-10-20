@@ -35,6 +35,20 @@ XIAOHEIHE_COOKIE_PATH = "/private/path/to/account-cookie.json"
 
 Cookie 文件只保存在本机并限制权限；更换账号或 `XIAOHEIHE_COOKIE_PATH` 后，必须重启 MCP 进程，让浏览器上下文重新加载 Cookie。发布前调用 `check_login_status`，以返回的用户名确认账号，不要仅凭 Cookie 文件名判断账号。
 
+### Cookie 过期与重新登录
+
+小黑盒 Cookie 有效期很短（实测约 1–2 天），过期后编辑器仍能打开，但账号显示为空或访客，发布会在最后一步失败。判断依据是页面/接口返回的用户名，不是“编辑器可编辑”。
+
+需要重新登录时运行：
+
+```bash
+HEYBOX_DLL=/abs/path/XiaoheiheMcpServer.Stdio.dll \
+HEYBOX_COOKIE=/abs/path/account-cookie.json \
+python3 scripts/heybox_login.py 240
+```
+
+脚本以 `--no-headless` 启动 MCP，弹出浏览器等待用户扫码（默认 240 秒），登录成功后 MCP 会把新 Cookie 写回同一文件，并备份旧文件为 `*.bak-before-login`。这一步必须由用户完成扫码，不能自动化；扫码前先说明目标账号（例如 `Galgame批评`），避免登进错误账号。
+
 ## 运行输入
 
 从用户任务和本地配置取得文集 URL、目标账号名称、目标社区（Gal 周报通常为 `Gal游戏综合区`）。Cookie 通过 `XIAOHEIHE_COOKIE_PATH` 引用本机文件，浏览器可执行文件通过 `XIAOHEIHE_CHROMIUM_PATH` 指定。不要从某个文件名推断已登录的账号。

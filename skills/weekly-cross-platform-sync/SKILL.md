@@ -20,8 +20,10 @@ description: 管理 B 站、微博、知乎和小黑盒之间的周报同步工�
 
 | 目标 | 默认适配器 | 重要边界 |
 | --- | --- | --- |
-| 微博头条文章 | [XinAloha/skills](https://github.com/XinAloha/skills/tree/main/content/post-to-weibo) | Markdown 可填充正文和本地图片；需独立 Chrome profile，组合完成后再核对并点击“发布” |
-| 知乎文章 | [guoxiaoyi/liduma-article-publisher](https://github.com/guoxiaoyi/liduma-article-publisher) 的导入流程或连接隔离会话的浏览器工具 | 含图周报导入带嵌图的 DOCX；按当前界面限制压缩，公开页核对全文和图片顺序；浏览器生命周期按下方共享规则 |
+| 微博头条文章 | 本仓库 `skills/weibo-weekly-sync/scripts/weibo-compose.cjs`（编排思路来自 [XinAloha/skills](https://github.com/XinAloha/skills/tree/main/content/post-to-weibo)） | 直排 v5 编辑器：标题/导语/正文/逐图粘贴；上游 `weibo-article.ts` 的 Chrome 启动器不带 `--no-sandbox`，在本机会以 `CDP connection closed` 失败，不要直接用它启动浏览器 |
+| 知乎文章 | 本仓库 `skills/zhihu-weekly-sync/scripts/zhihu-compose.cjs` | 直排正文（DOCX 导入当前被直答知识库配额拦截）；图片按 `/v2-<32hex>` 判定完成，禁止重复上传重试 |
+
+两个平台的脚本共用同一套会话约定：`scripts/browser-session.cjs` 的 `attach()` 复用已在运行的专用 Chrome，一步结束不关窗口，下一步继续复用（详见 [浏览器会话规则](references/browser-session.md)）。
 
 ## 执行顺序
 
