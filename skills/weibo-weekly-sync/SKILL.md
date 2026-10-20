@@ -56,12 +56,23 @@ stdio 配置示例：
 
 - 入口 `https://card.weibo.com/article/v3/editor`，已有草稿时 URL 形如 `#/draft/<id>`；有“写文章”按钮就先点它。
 - 身份核对：编辑器壳层会渲染登录账号昵称，必须等于 `Galgame批评`。**不要**用 `weibo.com` 首页判断登录态：未登录也会先渲染首页再跳 `newlogin`，DOM 不可靠。
-- 标题 `input[placeholder*="请输入标题"]`（32 字上限，超出截断），导语 `[placeholder*="导语"]`（44 字上限）。
+- 标题是 `textarea[placeholder*="请输入标题"]`（**不是 input**，32 字上限），导语是 `textarea[placeholder*="导语"]`（44 字上限）。
 - 正文：向 `.ProseMirror` 派发带 `text/html` 的 `ClipboardEvent('paste')`，图片位置先写成 `WBIMGPH_<n>` 文本占位。
-- 图片：逐个定位占位文本、用 `Range` 选中，再派发携带 `File` 的 `ClipboardEvent('paste')`。成功后出现 `figure.wb-node-image`，上传中带 `image-view__body--uploading`，完成后 `figure img` 的 `src` 变为 `https://wx*.sinaimg.cn/...`。
-- 校验：`figure` 数 = manifest 图片数；所有 `src` 为 `http(s)` 且不是 `r.sinaimg.cn/images/tc2.service.jpg`（编辑器占位图，实测会出现）；正文无 `WBIMGPH_` 残留；归一化全文与 manifest 一致。
-- 发布：v5 编辑器底部是“下一步”→ 发布设置页 → “发布”。捕获 `draft/publish` 响应并核对成功码，再回读 `https://weibo.com/ttarticle/p/show?id=...` 验证标题、作者、正文与图片。
-- 封面：发布设置页“设置封面”上传本期封面，不复用上一篇。
+- 图片必须“真实选区 + 合成粘贴”：先按占位文本的 `Range` 矩形做**真实鼠标点击**，用 `Shift+ArrowRight` 选中整个 token，按 `Backspace` 删除，再派发携带 `File` 的 `ClipboardEvent('paste')`。
+  - 只派发 paste 不选 token：图片会被插到文末，token 文本残留。
+  - 用 `execCommand('delete')` 删 token：ProseMirror 不认这个选区，粘贴仍落在旧位置。
+  - 滚动会改变布局，token 矩形要取两次（滚动后重算），并在删除前校验 `window.getSelection()` 是否等于 token。
+- 上传中状态是 `figure.wb-node-image` 内的 `image-view__body--uploading`，完成后 `figure img` 的 `src` 变为 `https://wx*.sinaimg.cn/...`；`r.sinaimg.cn/images/tc2.service.jpg` 是编辑器占位图，不能算成功。
+- 校验：`figure` 数 = manifest 图片数；所有 `src` 为 `http(s)` 且不是 `tc2.service`；正文无 `WBIMGPH_` 残留；归一化全文与 manifest 一致。
+
+### 发布步骤（v5 单页 + 弹窗）
+
+1. 底部是“保存草稿 / 预览 / 下一步”。用**真实 locator 点击** `button:has-text("下一步")`；用 DOM `click()` 点不动它。
+2. 点完后出现发布确认弹窗（内容形如 `字数 | 公开 | 发布`），页面同时多出一个“发布”按钮。
+3. 弹窗遮罩 `.n-modal-mask` 会拦截 footer 的“发布”按钮，此时用 DOM `click()` 触发 `button` 文本为“发布”的最后一个元素；不要用 `force: true` 反复重试。
+4. 成功后 SPA 跳到 `#/history/<draftId>`——**这不是公开链接**，草稿箱也会被清空。
+5. 公开链接从移动端时间线接口取：`https://m.weibo.cn/api/container/getIndex?type=uid&value=<uid>&containerid=107603<uid>`，找最新一条“发布了头条文章”的 `page_info.page_url`，形如 `https://weibo.com/ttarticle/p/show?id=230940...`。
+6. 回读公开页核对标题、作者（`Galgame批评`）、图片数（应等于 manifest 图片数）和正文长度，写入回执后才算成功。
 
 ### 登录态失效时
 
