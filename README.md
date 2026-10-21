@@ -26,17 +26,6 @@ python /path/to/skill-installer/scripts/install-skill-from-github.py \
 
 辅助脚本的依赖写在各 skill 的 SKILL.md 中。账号信息、Cookie 文件、下载的原文与运行记录保留在使用者本机，运行时传入。
 
-## 镜像到独立仓库
-
-若组织下存在与 skill 同名的独立仓库，可用 `scripts/push-org-repos.sh` 把 `skills/<name>/` 的历史（`git subtree split`）推到该仓库的 `main`，monorepo 仍是唯一编辑入口：
-
-```bash
-scripts/push-org-repos.sh                        # 全部 skill
-scripts/push-org-repos.sh weibo-weekly-sync      # 指定 skill
-```
-
-脚本不创建仓库：目标仓库需先在 GitHub 建好，否则会打印「不存在或当前 SSH key 无权限」并跳过。
-
 ## 增加技能
 
 新建 `skills/<lowercase-hyphenated-name>/`，包含 `SKILL.md`（frontmatter 的 `name` / `description` 正确）与至少一句定位的 `README.md`，按实际需要添加 `scripts/`、`references/`、`agents/`；**同步更新上方技能目录表格（加一行）**。其余约定（目录口径、提交前脱敏自检、发布与浏览器行为）见 [AGENTS.md](AGENTS.md)。
