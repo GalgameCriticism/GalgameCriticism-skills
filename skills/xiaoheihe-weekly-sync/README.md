@@ -12,3 +12,5 @@ Agent 执行说明见 [SKILL.md](SKILL.md)。
 python3 tests/test_fetch_weekly.py   # 期号定位、作者校验、manifest 不可变
 node tests/test_dedup.cjs            # 文章/视频去重判定
 ```
+
+只需安装 `skills/xiaoheihe-weekly-sync`；本目录包含所需的素材、会话和恢复约定，无需安装总调度或其他平台 skill。已有授权素材包时可直接复用；仅安装本平台需要的依赖即可。

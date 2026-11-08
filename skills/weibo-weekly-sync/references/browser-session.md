@@ -11,9 +11,9 @@
 
 始终保留 profile、Cookie、缓存和用户窗口；不删除锁文件，不调用 `--reset`、`--clean`、`--fresh`、`pkill`、`killall` 或会关闭/替换用户会话的辅助脚本。结束后不要 `agent-browser close` 或关闭连接到的浏览器。任务自己创建的临时 Cookie context 可以在任务结束后释放，但不得影响用户既有会话。
 
-## 一个窗口贯穿整条发布链（硬性要求）
+## 一个窗口贯穿本平台发布链（硬性要求）
 
-跨平台任务常被拆成“准备 → 校验 → 发布 → 回读”多步，每一步都 `launchPersistentContext` 再 `close` 会造成用户侧浏览器不停开合，并且每次重启都可能丢草稿、触发风控、甚至把登录态置入风险。
+发布任务常被拆成“准备 → 校验 → 发布 → 回读”多步，每一步都 `launchPersistentContext` 再 `close` 会造成用户侧浏览器不停开合，并且每次重启都可能丢草稿、触发风控、甚至把登录态置入风险。
 
 - 用 `scripts/browser-session.cjs` 的 `attach(profileDir, port)`：先 `connectOverCDP` 复用已在运行的专用 Chrome；探测不到调试端口才启动一次，并保持窗口不关。
 - 每步结束只断开连接、**不关闭浏览器**；下一步重新 `attach`。脚本失败或超时后同样先 `attach` 复查，不重开新窗口。

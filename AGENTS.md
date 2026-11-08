@@ -4,7 +4,7 @@
 
 ## 仓库定位
 
-GalgameCriticism 团队共用的 Agent Skills 仓库，会容纳各种各样的 skill。仓库级文件（根 README、本文件）只做仓库级的事；具体业务内容一律放在对应 skill 目录内。
+GalgameCriticism 团队的周报文字版发布技能仓库，按目标平台维护相互独立、可单独安装的 skill。仓库级文件（根 README、本文件）只做仓库级的事；具体业务内容一律放在对应 skill 目录内。
 
 ## 根 README 规则（强制）
 
