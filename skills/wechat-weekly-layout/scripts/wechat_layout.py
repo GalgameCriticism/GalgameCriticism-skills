@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Rebuild a WeChat weekly article from editable content and an inline-style theme."""
 import argparse
+import base64
 import copy
 import hashlib
 import html
@@ -268,6 +269,53 @@ def bound_layout(fragment):
     return result
 
 
+def local_image_data(assets, project, out, original_images=False):
+    """Read local bytes once; preserve originals and cache smaller clipboard copies."""
+    from io import BytesIO
+    from PIL import Image
+    sources = {}
+    original_bytes = copied_bytes = optimized = 0
+    for item in assets.values():
+        path = project / item['path']
+        raw = path.read_bytes()
+        original_bytes += len(raw)
+        with Image.open(path) as image:
+            image_format = image.format
+            mime = Image.MIME.get(image_format)
+            if mime not in ('image/png', 'image/jpeg', 'image/gif', 'image/webp'):
+                raise ValueError('不支持的本地图片格式：' + str(path))
+            data = raw
+            opaque = image.getchannel('A').getextrema() == (255, 255) if 'A' in image.getbands() else 'transparency' not in image.info
+            if not original_images and image_format == 'PNG' and opaque and not getattr(image, 'is_animated', False):
+                cache = out / 'clipboard-images' / (hashlib.sha256(raw + b'jpeg94-subsampling0-v1').hexdigest()[:20] + '.jpg')
+                if cache.exists():
+                    candidate = cache.read_bytes()
+                else:
+                    buffer = BytesIO()
+                    image.convert('RGB').save(buffer, 'JPEG', quality=94, subsampling=0, optimize=True)
+                    candidate = buffer.getvalue()
+                if len(candidate) < len(raw) * .8:
+                    cache.parent.mkdir(parents=True, exist_ok=True)
+                    if not cache.exists(): cache.write_bytes(candidate)
+                    data, mime = candidate, 'image/jpeg'
+                    optimized += 1
+        copied_bytes += len(data)
+        sources[output_asset_path(path, out)] = 'data:' + mime + ';base64,' + base64.b64encode(data).decode('ascii')
+    return sources, {'original_bytes': original_bytes, 'clipboard_image_bytes': copied_bytes, 'optimized_images': optimized}
+
+
+def embed_images(fragment, sources):
+    """Resolve only registered local image paths; no network URLs enter the clipboard."""
+    from bs4 import BeautifulSoup
+    soup = BeautifulSoup(fragment, 'html.parser')
+    for img in soup.find_all('img'):
+        path = img.get('src', '')
+        if path not in sources:
+            raise ValueError('正文图片没有对应本地文件：' + path)
+        img['src'] = sources[path]
+    return str(soup).replace('viewbox=', 'viewBox=').replace('attributename=', 'attributeName=')
+
+
 def render(args):
     from bs4 import BeautifulSoup
     data_path = Path(args.data).resolve()
@@ -283,8 +331,6 @@ def render(args):
     for story in data['stories']:
         if not story['title'].strip() or not story['paragraphs'] or any(not isinstance(p, str) or not p.strip() for p in story['paragraphs']):
             raise SystemExit('存在空标题或空正文：' + story['id'])
-    if not args.local_only and any(not a.get('url', '').startswith('https://') for a in assets.values()):
-        raise SystemExit('存在未绑定 HTTPS 图床地址的素材。先用 --local-only 预览；真实 URL 写回后再导出。')
     errors = []
     for key, item in assets.items():
         if not (project / item['path']).is_file():
@@ -292,14 +338,12 @@ def render(args):
     if errors:
         raise SystemExit('\n'.join(errors))
     generic_theme = load(Path(__file__).parent.parent / 'assets/components.json')
-    def output_body(local=False, static=False, compatible=False):
+    def output_body(static=False, compatible=False):
         use_theme = theme if not compatible else None
         def resolve(key):
             if key not in assets:
                 raise ValueError('未注册的素材：' + key)
-            if local:
-                return output_asset_path(project / assets[key]['path'], out)
-            return assets[key]['url']
+            return output_asset_path(project / assets[key]['path'], out)
         cards = {}
         for story in data['stories']:
             body = ''.join('<p style="white-space:normal;margin:0;padding:0;box-sizing:border-box;">' + html.escape(p) + '</p>' for p in story['paragraphs'])
@@ -346,21 +390,16 @@ def render(args):
                         spacer.decompose()
             result = str(soup).replace('viewbox=', 'viewBox=').replace('attributename=', 'attributeName=')
         return result
-    local = output_body(local=True)
+    local = output_body()
+    expanded_local = output_body(static=True)
+    safe_local = output_body(static=True, compatible=True)
+    sources, image_stats = local_image_data(assets, project, out, args.original_images)
+    for name, fragment in [('wechat.html', local), ('wechat-expanded.html', expanded_local), ('wechat-safe.html', safe_local)]:
+        embedded = embed_images(fragment, sources)
+        (out / name).write_text(embedded)
+        article_name = {'wechat.html': 'article.html', 'wechat-expanded.html': 'article-expanded.html', 'wechat-safe.html': 'article-safe.html'}[name]
+        (out / article_name).write_text(document(data['title'], embedded))
     (out / 'article-local.html').write_text(document(data['title'], local))
-    remote = output_body(local=args.local_only)
-    if args.local_only:
-        for name in ('wechat.html', 'wechat-expanded.html', 'wechat-safe.html', 'article.html', 'article-expanded.html', 'article-safe.html'):
-            (out / name).unlink(missing_ok=True)
-    else:
-        expanded = output_body(static=True)
-        compatible = output_body(static=True, compatible=True)
-        (out / 'wechat-safe.html').write_text(compatible)
-        (out / 'article-safe.html').write_text(document(data['title'], compatible))
-        (out / 'wechat.html').write_text(remote)
-        (out / 'wechat-expanded.html').write_text(expanded)
-        (out / 'article.html').write_text(document(data['title'], remote))
-        (out / 'article-expanded.html').write_text(document(data['title'], expanded))
     template = (Path(__file__).parent.parent / 'assets/preview.html').read_text()
     nav = ''.join('<a href="#chapter-' + str(i) + '"><span>' + str(i+1).zfill(2) + '</span>' + html.escape(s['name']) + '<small>' + str(len(s['stories'])) + '</small></a>' for i, s in enumerate(data['sections']))
     # Anchors belong to the preview wrapper only; the exported article has no app controls.
@@ -373,12 +412,16 @@ def render(args):
         node = b
         while node.parent and len(node.parent.find_all('strong')) == 1: node = node.parent
         node['id'] = story['id']
-    values = {'DATA_PATH': html.escape(output_asset_path(data_path, out), quote=True), 'EXPORT_READY': 'false' if args.local_only else 'true', 'TITLE': html.escape(data['title']), 'ISSUE': html.escape(str(data['issue'])),
+    for img in soup.find_all('img'):
+        img['data-local-src'] = img['src']
+        img['src'] = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
+    payload = json.dumps({'images': sources, 'templates': {'wechat.html': local, 'wechat-expanded.html': expanded_local, 'wechat-safe.html': safe_local}}, ensure_ascii=False).replace('<', '\\u003c')
+    values = {'LOCAL_PAYLOAD': payload, 'DATA_PATH': html.escape(output_asset_path(data_path, out), quote=True), 'TITLE': html.escape(data['title']), 'ISSUE': html.escape(str(data['issue'])),
               'SUBTITLE': html.escape(data['subtitle']), 'ARTICLE': str(soup).replace('viewbox=', 'viewBox=').replace('attributename=', 'attributeName='),
               'NAV': nav, 'COUNT': str(len(data['stories'])), 'ASSETS': str(len(assets))}
     for key, value in values.items(): template = template.replace('<!--' + key + '-->', value)
     (out / 'preview.html').write_text(template)
-    parsed = BeautifulSoup(remote, 'html.parser')
+    parsed = BeautifulSoup(local, 'html.parser')
     oversized = []
     for element in parsed.find_all(style=True):
         widths = re.findall(r'(?:^|;)\s*(?:max-)?width:\s*([\d.]+)%', element['style'])
@@ -388,8 +431,8 @@ def render(args):
         raise ValueError('输出仍含超宽元素：' + str(oversized))
     report = {'oversized_width_styles': oversized, 'stories': len(data['stories']), 'paragraphs': sum(len(s['paragraphs']) for s in data['stories']),
               'unique_assets': len(assets), 'missing_assets': errors,
-              'smil_galleries': len(BeautifulSoup(remote, 'html.parser').select('svg > animate')),
-              'export_ready': not args.local_only, 'published_or_uploaded': False, 'wechat_editor_roundtrip_verified': False}
+              'smil_galleries': len(parsed.select('svg > animate')),
+              'export_ready': True, 'image_source': 'local-embedded', 'external_image_requests_required': False, **image_stats, 'published_or_uploaded': False, 'wechat_editor_roundtrip_verified': False}
     save(out / 'validation.json', report)
     print(json.dumps(report, ensure_ascii=False, indent=2))
 
@@ -411,7 +454,7 @@ def main():
     x = commands.add_parser('extract-docx'); x.add_argument('docx'); x.add_argument('--out', required=True)
     x.set_defaults(run=lambda a: save(a.out, {'paragraphs': paragraphs(a.docx)}))
     x = commands.add_parser('import-reference'); x.add_argument('--html', required=True); x.add_argument('--docx', required=True); x.add_argument('--url', required=True); x.add_argument('--out', required=True); x.set_defaults(run=import_reference)
-    x = commands.add_parser('render'); x.add_argument('--data', required=True); x.add_argument('--theme'); x.add_argument('--out', required=True); x.add_argument('--local-only', action='store_true'); x.set_defaults(run=render)
+    x = commands.add_parser('render'); x.add_argument('--data', required=True); x.add_argument('--theme'); x.add_argument('--out', required=True); x.add_argument('--local-only', action='store_true', help='兼容旧命令；所有输出默认都使用本地图片且可复制'); x.add_argument('--original-images', action='store_true', help='按原始字节内嵌图片，不生成 JPEG 优化副本'); x.set_defaults(run=render)
     args = p.parse_args(); args.run(args)
 
 

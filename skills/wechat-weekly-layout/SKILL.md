@@ -1,13 +1,13 @@
 ---
 name: wechat-weekly-layout
-description: 将公众号周报的 Word 文字稿和图包排成带封面、章节、装饰新闻卡、多图滑动或点击展开、往期推荐与 Staff 的富文本 HTML；也可读取用户提供的微信文章复刻版式。用于公众号周报排版和替代秀米的本地生成流程。
+description: 从本地 Word 和图包排版公众号周报，生成可离线打开、一键复制全部图文的预览与内嵌图片 HTML，支持封面、章节装饰、多图交互、往期推荐和 Staff；也可参考已授权微信文章复刻版式。
 ---
 
 # 公众号周报排版
 
-用中文沟通。交付可审阅的本地预览、可编辑内容 JSON、公众号正文 HTML 和折叠区展开版。保留文字稿内容与图片归属，按用户的参考和反馈调整样式。
+用中文沟通。默认流程是「本地文字稿与图片 → 本地排版 → 打开预览一键复制 → 粘贴公众号」。交付可离线独立打开的 `preview.html`、可编辑内容 JSON、内嵌图片的正文 HTML 和折叠区展开版。保留文字稿内容与图片归属，按用户的参考和反馈调整样式。
 
-脚本路径均相对本 skill 目录：`scripts/wechat_layout.py`。依赖见 `requirements.txt`（`beautifulsoup4`、`requests`、`Pillow`）；浏览器预览和截图使用可用的 Chromium/Playwright。生成器只写本地产物，不登录、上传或发布公众号。
+脚本路径均相对本 skill 目录：`scripts/wechat_layout.py`。依赖见 `requirements.txt`（`beautifulsoup4`、`requests`、`Pillow`）；浏览器预览和截图使用可用的 Chromium/Playwright。生成器只读本地图片并写本地产物，不登录、不上传图床、不发布公众号。`assets[].url` 只是可选来源元数据，不参与渲染或复制；图片以 `assets[].path` 指向的真实本地文件为准。
 
 ## 复刻一篇已有微信文章
 
@@ -39,23 +39,26 @@ python3 <skill>/scripts/wechat_layout.py init --out <project> --issue '<期号>'
 用脚本的通用组件生成；此模式不传 `--theme`：
 
 ```sh
-python3 <skill>/scripts/wechat_layout.py render --data <project>/source/article.json --out <project>/output --local-only
+python3 <skill>/scripts/wechat_layout.py render --data <project>/source/article.json --out <project>/output
 ```
 
 通用卡片沿用参考文章的绿色／粉色虚线交替样式，支持 `swipe`、`fold`、`stack` 图组。封面必须对应本期：原封面内的期号和插画是图片内容，修改 JSON 不会修改图片；使用本期成品封面，或按参考另行制作。
 
-`--local-only` 可先使用本地图片审稿，复制和公众号导出会禁用。真实微信图床 HTTPS URL 写回素材表后，去掉该参数生成正式 HTML。图床上传按用户实际授权和可用工具执行；不要虚构 URL，也不要擅自把素材上传公开服务。
+所有渲染产物都默认使用本地图片；没有 `url` 也能生成、预览和复制。旧参数 `--local-only` 仅为命令兼容保留，不再限制复制或导出。复制和 HTML 中的图片使用内嵌 `data:image/...;base64,...` 字节，不能写成 `file://`、`localhost` 或图床地址。
+
+预览文件内保存本地图片数据与正文模板，复制按钮不再 `fetch` 正文或图片；双击单个预览文件也可用。为减少多图剪贴板体积，默认对较大的、不透明、非动画 PNG 生成 JPEG 94 质量副本，保持尺寸，透明图片和动画原样保留；原图不覆盖。需要逐字节保留图片时传 `--original-images`。派生副本放输出目录的 `clipboard-images/`，不入技能仓库。
 
 ## 预览与完成标准
 
-在项目目录启动本地 HTTP 服务，如 `python3 -m http.server 8765 --bind 127.0.0.1`，展示 `http://127.0.0.1:8765/output/preview.html`；从 HTTP 页面使用“复制公众号正文”。
+直接在浏览器打开 `output/preview.html`，点击“复制公众号正文”，随后粘贴到公众号。也可启动本地 HTTP 服务展示预览，但它不是复制图片的依赖；正文不从服务读取图片。粘贴后等待公众号完成图片处理，再保存草稿并核验。
 
 交付前检查：
 
 - 原稿每条新闻及正文段落完整，对应章节、标题、图片正确；往期推荐链接真实，Staff 署名有据可查。
 - 在 320px、375px、430px 手机宽度以及桌面宽度查看封面、章节、长标题、混合日文、长正文、尾部。所有图片加载成功；去除正文外层裁切后，整页和内部各元素仍不得超过父级宽度。可用 `tests/check-layout.mjs <纯正文预览URL>` 执行回归。
 - 对实际折叠区点击，确认高度增长、最后一张图显示完整；横向图组可滑至末图。通用 SVG 的高度依据图片宽高计算，不复制上一组的固定百分比；展开前后宽度保持不变。新组件用 `viewBox` 动画改变固有纵横比，避免使用超过 100% 的宽度动画。
-- 复制后读取剪贴板 `text/html`，并在可用时实际粘贴到通用 contenteditable 复查内部宽度；确认图片 URL、SVG 与内联样式仍在，且未混入预览页控件。正式正文不含 JavaScript、外链 CSS 或普通网页 `details` 交互。
+- 复制后读取剪贴板 `text/html`，并在可用时实际粘贴到通用 contenteditable 复查内部宽度；确认所有图片均为内嵌数据，SVG 与内联样式仍在，且未混入预览页控件。正式正文不含 JavaScript、外链 CSS 或普通网页 `details` 交互。
+- 在禁止外网请求的环境下检查预览和复制；再断开网络，直接打开单个 HTML 文件并实际粘贴到通用 contenteditable，核对全部图片可解码、顺序及正文完整。复制不能依赖图床 URL、本地服务存活或其他图片文件。透明图和 GIF 的字节保真回归见 `tests/test_local_images.py`；`tests/check-local-copy.mjs <preview.html>` 会把单个预览复制到独立临时目录，断网后检查两种复制按钮与原生粘贴。
 - 本地浏览器检查与公众号编辑器检查分别记录。未经过“粘贴到草稿→保存→重新读取→手机预览”时，明确交代尚未验证微信编辑器保留效果。同时提供 `wechat-expanded.html` 作为折叠区展开版，以及 `wechat-safe.html`／预览页“兼容复制”作为全部图片纵向展开、没有 SVG 或横滑的备选。
 
 `output/validation.json` 记录结构检查，不代表视觉检查或微信端验收。提供预览入口和需要的导出文件，简要说明验证结果与实际限制。

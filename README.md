@@ -8,7 +8,7 @@
 
 | 平台 | Skill | 用途 |
 | --- | --- | --- |
-| 微信公众号 | [wechat-weekly-layout](skills/wechat-weekly-layout/README.md) | 将 Word 和图包排成带封面、章节装饰与多图交互的公众号 HTML，生成预览与可复制富文本。 |
+| 微信公众号 | [wechat-weekly-layout](skills/wechat-weekly-layout/README.md) | 将 Word 与本地图包排成带装饰与多图交互的公众号 HTML，支持离线预览及一键复制全部图文，无需图床。 |
 | B 站 | [bilibili-weekly-article](skills/bilibili-weekly-article/README.md) | 将文字稿与图包制作成 B 站图文，核对署名、预览并提交草稿或发布。 |
 | 小黑盒 | [xiaoheihe-weekly-sync](skills/xiaoheihe-weekly-sync/README.md) | 从授权来源或素材包发布小黑盒周报，核对账号、社区及去重状态。 |
 | 微博 | [weibo-weekly-sync](skills/weibo-weekly-sync/README.md) | 从授权来源或素材包编排微博头条文章，发布并回读正文与图片。 |

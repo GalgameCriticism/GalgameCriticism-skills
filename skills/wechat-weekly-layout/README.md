@@ -1,30 +1,39 @@
 # wechat-weekly-layout
 
-独立将周报 Word 和图包排成公众号图文 HTML：封面、章节装饰、交替新闻卡、多图滑动或点击展开、往期推荐与 Staff；也可读取同一期微信文章复刻版式。
+独立将本地 Word 和图包排成公众号周报，生成能离线打开、一键复制全部正文与图片的预览。支持封面、章节装饰、交替新闻卡、多图交互、往期推荐与 Staff，也可参考已授权的微信文章复刻版式。
 
-只需安装 `skills/wechat-weekly-layout`，无需安装其他平台技能。当前能力包含本地生成、预览和富文本复制，不包含登录公众号、自动上传图床或点击发表。
+只需安装本 skill；不要求图床、公众号 API 密钥、浏览器扩展或其他平台技能。
 
-## 使用
+## 从本地到公众号
 
-安装 Python 依赖：`python3 -m pip install -r <skill>/requirements.txt`。然后让 agent 读取 [SKILL.md](SKILL.md)，并提供本期 Word、图包、封面及真实署名；素材结构见 [content-schema.md](references/content-schema.md)。
+安装 Python 依赖：`python3 -m pip install -r <skill>/requirements.txt`。将本期 Word、图包、封面及真实署名交给 agent，按 [SKILL.md](SKILL.md) 生成排版。
 
-请求示例：
+1. 双击生成的 `output/preview.html`，或通过本地 HTTP 服务打开它。
+2. 点击“复制公众号正文”，正文、样式和本地图片字节一起进入剪贴板。
+3. 到公众号正文编辑器粘贴，等待图片处理完成后保存草稿，再检查手机预览。
 
-> 用 wechat-weekly-layout 把本目录的 Word 和图包排成公众号周报，保留多图交互，先给本地预览。
+预览文件自带所需图片与正文模板，移动单个文件或断网后仍可预览、复制；复制结果不含 `file://`、`localhost` 或远程图片 URL。无需先上传图床。公众号侧的粘贴、图片处理和草稿保存仍由用户完成。
 
-素材只有本地文件时可先 `render --local-only` 审稿；真实 HTTPS 图床 URL 写回后再生成公众号 HTML。预览通过本地 HTTP 服务打开，点击“复制公众号正文”后粘贴到公众号草稿。
+原图保留在本地素材目录；默认对合适的不透明 PNG 生成较小的高质量 JPEG 副本用于复制，保持尺寸，透明图和动画不转换。需要按原图字节复制时加 `--original-images`。旧 `--local-only` 参数仍可接受，所有模式都能复制和导出。
 
-## 宽度与编辑器检查
+“兼容复制”会把全部配图纵向展开。标准版保留多图交互；本地和通用编辑器验证不代替公众号实际保存回读与手机预览。
 
-生成器将旧版 `160%～640%` 滑动轨道转换为宽度 `100%` 的 flex 图组；折叠改用 SVG `viewBox` 动画改变高度，展开时不增加宽度。检查文章内部元素，不依赖外层 `overflow:hidden` 遮盖溢出。
+## 生成与检查
 
-浏览器回归脚本可对生成稿检查手机／桌面宽度、图片、折叠和横向图组：
+内容格式见 [content-schema.md](references/content-schema.md)。渲染只依赖 `assets[].path` 本地文件，`url` 仅是可选来源记录。
+
+```bash
+python3 <skill>/scripts/wechat_layout.py render --data <project>/source/article.json --out <project>/output
+python3 <skill>/tests/test_local_images.py
+```
+
+浏览器回归脚本检查内部宽度、图片、折叠和横滑：
 
 ```bash
 npm install --prefix <skill>/tests playwright
-# 已安装 Playwright 浏览器时可省略；也可用 CHROME_PATH 指向本机 Chrome。
 npx --prefix <skill>/tests playwright install chromium
 node <skill>/tests/check-layout.mjs http://127.0.0.1:8765/output/article-local.html
+node <skill>/tests/check-local-copy.mjs <project>/output/preview.html
 ```
 
-本地浏览器、通用 contenteditable 粘贴、公众号后台保存回读和微信手机预览是不同验证阶段。未在实际公众号后台核验时，不能保证其过滤器完全保留 SVG；另提供折叠区展开版，以及把所有配图纵向展开的“兼容复制”／`wechat-safe.html` 作为备选。
+也可设置 `CHROME_PATH` 使用本机 Chrome。生成器将旧超宽轨道转换为有界 flex 图组，SVG 通过 `viewBox` 动画改变高度，展开时保持宽度不变；窄屏检查包含最后一张图片是否完整。
