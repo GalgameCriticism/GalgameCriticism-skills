@@ -27,7 +27,7 @@ python3 <skill>/scripts/wechat_layout.py render --data <project>/source/article.
 
 ## 下一期从文字稿和图包生成
 
-读取 [内容结构与素材映射](references/content-schema.md)，按其格式组织 JSON。初始品牌素材含三个栏目条与“推荐阅读”章节条，不含旧期新闻配图或封面。
+读取 [内容结构与素材映射](references/content-schema.md)，按其格式组织 JSON。初始框架素材在 `assets/brand/`：三个栏目条、“推荐阅读”章节条，以及“点击展开”“左右滑动”两张提示图，共六张，随技能安装。`init` 全量复制并登记 `gallery_hints`；不含旧期新闻配图或封面。
 
 ```sh
 python3 <skill>/scripts/wechat_layout.py extract-docx '<文字稿.docx>' --out <project>/source/paragraphs.json

@@ -1,22 +1,38 @@
 {
   "6ed21b4d0d8fda0b": {
-    "path": "assets/6ed21b4d0d8fda0b.png",
+    "path": "assets/chapter-new.png",
     "width": 1080,
-    "height": 90
+    "height": 90,
+    "role": "chapter-new"
   },
   "ee66640b0c454f43": {
-    "path": "assets/ee66640b0c454f43.png",
+    "path": "assets/chapter-translation.png",
     "width": 1080,
-    "height": 90
+    "height": 90,
+    "role": "chapter-translation"
   },
   "3355e08abcd211a4": {
-    "path": "assets/3355e08abcd211a4.png",
+    "path": "assets/chapter-merch.png",
     "width": 1080,
-    "height": 90
+    "height": 90,
+    "role": "chapter-merch"
   },
   "bdf51f10e69ae164": {
-    "path": "assets/bdf51f10e69ae164.png",
+    "path": "assets/section-recommended.png",
     "width": 1080,
-    "height": 135
+    "height": 135,
+    "role": "recommendations"
+  },
+  "gallery-expand": {
+    "path": "assets/gallery-expand.png",
+    "width": 1080,
+    "height": 68,
+    "role": "gallery-fold-hint"
+  },
+  "gallery-swipe": {
+    "path": "assets/gallery-swipe.png",
+    "width": 1080,
+    "height": 68,
+    "role": "gallery-swipe-hint"
   }
 }

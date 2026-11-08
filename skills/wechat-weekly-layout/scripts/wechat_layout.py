@@ -189,8 +189,9 @@ def init_issue(args):
     with Image.open(cover_path) as im:
         assets[key] = {'path': dst, 'url': '', 'width': im.width, 'height': im.height}
     names = ['新作', '汉化', '周边']
-    sections = [{'name': name, 'banner': k, 'stories': []} for name, k in zip(names, list(assets)[:3])]
-    save(root / 'source/article.json', {'schema_version': 1, 'issue': args.issue, 'title': args.title, 'subtitle': args.title, 'account': 'Galgame批评', 'cover': key, 'sections': sections, 'stories': [], 'staff': [], 'recommendation_banner': 'bdf51f10e69ae164', 'recommendations': [], 'assets': assets})
+    chapter_keys = [next(k for k, item in assets.items() if item.get('role') == role) for role in ('chapter-new', 'chapter-translation', 'chapter-merch')]
+    sections = [{'name': name, 'banner': key, 'stories': []} for name, key in zip(names, chapter_keys)]
+    save(root / 'source/article.json', {'schema_version': 1, 'issue': args.issue, 'title': args.title, 'subtitle': args.title, 'account': 'Galgame批评', 'cover': key, 'sections': sections, 'stories': [], 'staff': [], 'recommendation_banner': 'bdf51f10e69ae164', 'gallery_hints': {'fold': 'gallery-expand', 'swipe': 'gallery-swipe'}, 'recommendations': [], 'assets': assets})
     print(root / 'source/article.json')
 
 
@@ -198,23 +199,25 @@ def image_tag(src, alt=''):
     return f'<img src="{html.escape(src, quote=True)}" alt="{html.escape(alt, quote=True)}" width="100%" style="display:block;width:100%;max-width:100%;height:auto;vertical-align:middle;box-sizing:border-box;">'
 
 
-def generic_gallery(gallery, resolve, assets, static=False):
+def generic_gallery(gallery, resolve, assets, static=False, hint_id=None):
     ids = gallery.get('images', [])
     if not ids:
         return ''
     mode = gallery.get('mode', 'swipe')
     if mode == 'swipe' and not static:
-        tiles = ''.join('<section style="display:inline-block;vertical-align:middle;width:80%;padding:0 5px;box-sizing:border-box;white-space:normal;">' + image_tag(resolve(k)) + '</section>' for k in ids)
-        return '<section style="margin:12px 0;overflow-x:auto;white-space:nowrap;width:100%;box-sizing:border-box;"><p style="margin:0 0 8px;text-align:center;font-size:12px;color:#999;">← 左右滑动查看更多图片 →</p>' + tiles + '</section>'
+        tiles = ''.join('<section style="display:inline-block;vertical-align:middle;width:80%;padding:0 5px;box-sizing:border-box;white-space:normal;"><section style="border-radius:12px;overflow:hidden;line-height:0;box-sizing:border-box;">' + image_tag(resolve(k)) + '</section></section>' for k in ids)
+        hint = image_tag(resolve(hint_id), '左右滑动查看更多') if hint_id else '<p style="margin:0 0 8px;text-align:center;font-size:12px;color:#999;">← 左右滑动查看更多图片 →</p>'
+        return '<section style="margin:12px 0;width:100%;box-sizing:border-box;">' + hint + '<section style="overflow-x:auto;white-space:nowrap;width:100%;box-sizing:border-box;">' + tiles + '</section></section>'
     stack = ''.join('<section style="margin:0 0 2%;line-height:0;">' + image_tag(resolve(k)) + '</section>' for k in ids)
     if mode != 'fold' or static:
         return '<section style="margin:12px 0;">' + stack + '</section>'
     # The image stack has zero flow height. The transparent SVG is the animated spacer.
     # Animating viewBox changes intrinsic height while width stays bounded at 100%.
-    ratio = sum(assets[k]['height'] / assets[k]['width'] + .02 for k in ids) + .10
+    hint_ratio = assets[hint_id]['height'] / assets[hint_id]['width'] + .02 if hint_id else .10
+    ratio = sum(assets[k]['height'] / assets[k]['width'] + .02 for k in ids) + hint_ratio + .02
     if ratio <= .6:
         return '<section style="margin:12px 0;">' + stack + '</section>'
-    hint = '<section style="font-size:12px;color:#999;text-align:center;line-height:1.8;padding:1% 0;">点击图片展开全部 ↓</section>'
+    hint = '<section style="padding:1% 0;line-height:0;">' + image_tag(resolve(hint_id), '点击展开图集') + '</section>' if hint_id else '<section style="font-size:12px;color:#999;text-align:center;line-height:1.8;padding:1% 0;">点击图片展开全部 ↓</section>'
     return f'''<section style="margin:12px 0;overflow:hidden;width:100%;border-radius:12px;background:#fcfcfc;box-sizing:border-box;">
 <section style="height:0;overflow:visible;">{hint}{stack}</section>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 60" width="100%" style="display:block;width:100%;max-width:100%;height:auto;pointer-events:none;">
@@ -355,8 +358,8 @@ def render(args):
                 card = re.sub(r'\{\{image:(\d+)\}\}', lambda m: html.escape(resolve(story['images'][int(m[1])]), quote=True), card)
             else:
                 card = generic_theme['odd' if int(story['number']) % 2 else 'even']
-                lead = image_tag(resolve(story['lead'])) if story.get('lead') else ''
-                gallery = generic_gallery(story.get('gallery', {}), resolve, assets, static)
+                lead = '<section style="border-radius:12px;overflow:hidden;line-height:0;border:1px solid rgba(0,0,0,.05);box-shadow:0 2px 8px rgba(0,0,0,.05);box-sizing:border-box;">' + image_tag(resolve(story['lead'])) + '</section>' if story.get('lead') else ''
+                gallery = generic_gallery(story.get('gallery', {}), resolve, assets, static, data.get('gallery_hints', {}).get(story.get('gallery', {}).get('mode')))
                 card = card.replace('{{lead}}', lead).replace('{{gallery}}', gallery)
             cards[story['id']] = card.replace('{{number}}', str(int(story['number']))).replace('{{title}}', html.escape(story['title'])).replace('{{body}}', body)
         if use_theme:

@@ -58,6 +58,22 @@ class LocalImageTests(unittest.TestCase):
             self.assertTrue(source.startswith('data:image/png;base64,'))
             self.assertEqual(base64.b64decode(source.split(',', 1)[1]), image.read_bytes())
 
+    def test_init_copies_all_six_framework_assets(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            cover = root / 'cover.png'
+            Image.new('RGB', (32, 20), 'white').save(cover)
+            project = root / 'issue'
+            subprocess.run([sys.executable, str(SCRIPT), 'init', '--out', str(project), '--issue', '1',
+                            '--title', '本地周报', '--cover', str(cover)], check=True, capture_output=True)
+            data = layout.load(project / 'source/article.json')
+            framework = [item for item in data['assets'].values() if item.get('role')]
+            self.assertEqual(len(framework), 6)
+            self.assertEqual(set(data['gallery_hints']), {'fold', 'swipe'})
+            for item in framework:
+                self.assertTrue((project / item['path']).is_file())
+            self.assertEqual(len(data['sections']), 3)
+
     def test_animation_bytes_are_preserved(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)

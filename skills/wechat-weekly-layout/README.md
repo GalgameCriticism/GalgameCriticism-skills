@@ -37,3 +37,18 @@ node <skill>/tests/check-local-copy.mjs <project>/output/preview.html
 ```
 
 也可设置 `CHROME_PATH` 使用本机 Chrome。生成器将旧超宽轨道转换为有界 flex 图组，SVG 通过 `viewBox` 动画改变高度，展开时保持宽度不变；窄屏检查包含最后一张图片是否完整。
+
+## 随技能分发的框架图片
+
+六张 PNG 均保存在本目录的 `assets/brand/`，随 skill 一起安装；`init` 会复制到本期本地素材目录，无需联网下载。
+
+| 文件 | 用途 | 尺寸 |
+| --- | --- | --- |
+| [chapter-new.png](assets/brand/chapter-new.png) | 新作资讯章节条 | 1080 × 90 |
+| [chapter-translation.png](assets/brand/chapter-translation.png) | 汉化情报章节条 | 1080 × 90 |
+| [chapter-merch.png](assets/brand/chapter-merch.png) | 周边信息章节条 | 1080 × 90 |
+| [section-recommended.png](assets/brand/section-recommended.png) | 推荐阅读章节条 | 1080 × 135 |
+| [gallery-expand.png](assets/brand/gallery-expand.png) | 点击展开图集提示 | 1080 × 68 |
+| [gallery-swipe.png](assets/brand/gallery-swipe.png) | 左滑查看更多提示 | 1080 × 68 |
+
+素材标识、用途和尺寸由 [manifest.json](assets/brand/manifest.json) 记录；新闻卡片的虚线、编号和圆角由内联样式生成。本期封面、新闻配图、往期封面和正文保存在使用者本机，不随 skill 上传仓库。
