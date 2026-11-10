@@ -19,13 +19,15 @@
 const toast=document.querySelector('#toast');let toastTimer;
 const localPayload=JSON.parse(document.querySelector('#local-payload').textContent);
 function localSource(path){const value=localPayload.images[path];if(!value||!value.startsWith('data:image/'))throw Error('未找到本地图片：'+path);return value}
+function copySource(path){if(!localPayload.remoteImages)return localSource(path);const value=localPayload.remoteImages[path];if(!value||!value.startsWith('https://'))throw Error('缺少图床直链：'+path);return value}
+if(localPayload.remoteImages){document.querySelector('.status').textContent='图床复制预览';document.querySelector('.detail').textContent='预览图片保存在本地；复制时使用已验证的 HTTPS 图床直链。请联网粘贴到公众号，等待图片处理完成，保存后重新打开核对。'}
 document.querySelectorAll('#article img[data-local-src]').forEach(img=>{img.src=localSource(img.dataset.localSrc);img.removeAttribute('data-local-src')});
 function message(t){clearTimeout(toastTimer);toast.textContent=t;toast.hidden=false;toastTimer=setTimeout(()=>toast.hidden=true,8500)}
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{document.body.classList.toggle('wide',b.dataset.view==='wide');document.querySelectorAll('[data-view]').forEach(x=>x.classList.toggle('active',x===b));document.querySelector('.paper-top span').textContent=b.dataset.view==='wide'?'公众号正文 · 637 px':'公众号正文 · 390 px'});
 function buildCopy(filename){
   const source=localPayload.templates[filename];if(!source)throw Error('找不到正文模板');
   const template=document.createElement('template');template.innerHTML=source;
-  template.content.querySelectorAll('img').forEach(img=>img.setAttribute('src',localSource(img.getAttribute('src'))));
+  template.content.querySelectorAll('img').forEach(img=>img.setAttribute('src',copySource(img.getAttribute('src'))));
   return {html:template.innerHTML,plain:template.content.textContent};
 }
 function copyWithEvent(content){
@@ -43,7 +45,7 @@ async function copyArticle(filename,button){
     }
     if(!copied)copied=copyWithEvent(content);
     if(!copied)throw Error('浏览器没有允许写入剪贴板，请在 Chrome 或 Edge 中打开此预览');
-    message('已复制正文和本地图片。请粘贴到公众号，等待图片处理完成后保存草稿。');
+    message(localPayload.remoteImages?'已复制正文和图床直链。请联网粘贴到公众号，等待图片处理完成后保存草稿。':'已复制正文和本地图片。请粘贴到公众号，等待图片处理完成后保存草稿。');
   }catch(error){message('复制未完成：'+error.message)}
   finally{button.disabled=false;button.textContent=label}
 }
