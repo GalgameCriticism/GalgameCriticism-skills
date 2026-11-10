@@ -11,6 +11,8 @@ from pathlib import Path
 from zipfile import ZipFile
 from xml.etree import ElementTree as ET
 
+from image_policy import MAX_BYTES, POLICY_VERSION, prepare_image
+
 
 def load(p):
     return json.loads(Path(p).read_text())
@@ -290,38 +292,33 @@ def bound_layout(fragment):
 
 
 def local_image_data(assets, project, out, original_images=False):
-    """Read local bytes once; preserve originals and cache smaller clipboard copies."""
-    from io import BytesIO
-    from PIL import Image
-    sources = {}
+    """Prepare capped publication copies for both local and hosted exports."""
+    sources, records = {}, []
     original_bytes = copied_bytes = optimized = 0
-    for item in assets.values():
+    for key, item in assets.items():
         path = project / item['path']
         raw = path.read_bytes()
+        try:
+            data, mime, details = prepare_image(raw, decoration=bool(item.get('role')), original=original_images)
+        except ValueError as error:
+            raise ValueError(f'图片 {key}：{error}') from None
         original_bytes += len(raw)
-        with Image.open(path) as image:
-            image_format = image.format
-            mime = Image.MIME.get(image_format)
-            if mime not in ('image/png', 'image/jpeg', 'image/gif', 'image/webp'):
-                raise ValueError('不支持的本地图片格式：' + str(path))
-            data = raw
-            opaque = image.getchannel('A').getextrema() == (255, 255) if 'A' in image.getbands() else 'transparency' not in image.info
-            if not original_images and image_format == 'PNG' and opaque and not getattr(image, 'is_animated', False):
-                cache = out / 'clipboard-images' / (hashlib.sha256(raw + b'jpeg94-subsampling0-v1').hexdigest()[:20] + '.jpg')
-                if cache.exists():
-                    candidate = cache.read_bytes()
-                else:
-                    buffer = BytesIO()
-                    image.convert('RGB').save(buffer, 'JPEG', quality=94, subsampling=0, optimize=True)
-                    candidate = buffer.getvalue()
-                if len(candidate) < len(raw) * .8:
-                    cache.parent.mkdir(parents=True, exist_ok=True)
-                    if not cache.exists(): cache.write_bytes(candidate)
-                    data, mime = candidate, 'image/jpeg'
-                    optimized += 1
         copied_bytes += len(data)
+        if data != raw:
+            optimized += 1
+            suffix = {'image/jpeg': '.jpg', 'image/png': '.png', 'image/gif': '.gif', 'image/webp': '.webp'}[mime]
+            cache = out / 'clipboard-images' / (hashlib.sha256(data).hexdigest()[:20] + suffix)
+            cache.parent.mkdir(parents=True, exist_ok=True)
+            if not cache.exists():
+                cache.write_bytes(data)
+            details['copy_path'] = output_asset_path(cache, out)
+        records.append({'asset': key, **details})
         sources[output_asset_path(path, out)] = 'data:' + mime + ';base64,' + base64.b64encode(data).decode('ascii')
-    return sources, {'original_bytes': original_bytes, 'clipboard_image_bytes': copied_bytes, 'optimized_images': optimized}
+    save(out / 'image-compression.json', {'policy': POLICY_VERSION, 'max_bytes': MAX_BYTES,
+         'original_images': original_images, 'images': records})
+    return sources, {'original_bytes': original_bytes, 'clipboard_image_bytes': copied_bytes,
+                     'optimized_images': optimized, 'max_image_bytes': max((x['bytes'] for x in records), default=0),
+                     'image_policy': POLICY_VERSION, 'image_cap_enforced': not original_images}
 
 
 def embed_images(fragment, sources):
@@ -435,7 +432,7 @@ def render(args):
     for img in soup.find_all('img'):
         img['data-local-src'] = img['src']
         img['src'] = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
-    payload = json.dumps({'images': sources, 'templates': {'wechat.html': local, 'wechat-expanded.html': expanded_local, 'wechat-safe.html': safe_local}}, ensure_ascii=False).replace('<', '\\u003c')
+    payload = json.dumps({'images': sources, 'image_policy': POLICY_VERSION, 'image_roles': {output_asset_path(project / a['path'], out): a.get('role') for a in assets.values()}, 'templates': {'wechat.html': local, 'wechat-expanded.html': expanded_local, 'wechat-safe.html': safe_local}}, ensure_ascii=False).replace('<', '\\u003c')
     values = {'LOCAL_PAYLOAD': payload, 'DATA_PATH': html.escape(output_asset_path(data_path, out), quote=True), 'TITLE': html.escape(data['title']), 'ISSUE': html.escape(str(data['issue'])),
               'SUBTITLE': html.escape(data['subtitle']), 'ARTICLE': str(soup).replace('viewbox=', 'viewBox=').replace('attributename=', 'attributeName='),
               'NAV': nav, 'COUNT': str(len(data['stories'])), 'ASSETS': str(len(assets))}
@@ -474,7 +471,7 @@ def main():
     x = commands.add_parser('extract-docx'); x.add_argument('docx'); x.add_argument('--out', required=True)
     x.set_defaults(run=lambda a: save(a.out, {'paragraphs': paragraphs(a.docx)}))
     x = commands.add_parser('import-reference'); x.add_argument('--html', required=True); x.add_argument('--docx', required=True); x.add_argument('--url', required=True); x.add_argument('--out', required=True); x.set_defaults(run=import_reference)
-    x = commands.add_parser('render'); x.add_argument('--data', required=True); x.add_argument('--theme'); x.add_argument('--out', required=True); x.add_argument('--local-only', action='store_true', help='兼容旧命令；所有输出默认都使用本地图片且可复制'); x.add_argument('--original-images', action='store_true', help='按原始字节内嵌图片，不生成 JPEG 优化副本'); x.set_defaults(run=render)
+    x = commands.add_parser('render'); x.add_argument('--data', required=True); x.add_argument('--theme'); x.add_argument('--out', required=True); x.add_argument('--local-only', action='store_true', help='兼容旧命令；所有输出默认都使用本地图片且可复制'); x.add_argument('--original-images', action='store_true', help='仅在明确要求时按原始字节内嵌，跳过默认 500 KiB 压缩限制'); x.set_defaults(run=render)
     args = p.parse_args(); args.run(args)
 
 

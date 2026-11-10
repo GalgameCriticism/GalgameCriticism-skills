@@ -17,6 +17,28 @@ from urllib.parse import urlsplit
 from bs4 import BeautifulSoup
 import requests
 
+from image_policy import MAX_BYTES, POLICY_VERSION, prepare_image
+
+
+def prepare_payload_images(payload, original_images=False):
+    if payload.get('image_policy') != POLICY_VERSION:
+        raise ValueError('预览尚未使用当前 500 KiB 图片策略，请先用当前 skill 重新 render')
+    roles = payload.get('image_roles', {})
+    prepared, largest = {}, 0
+    for path, source in payload['images'].items():
+        try:
+            header, encoded = source.split(',', 1)
+            if not header.startswith('data:image/') or ';base64' not in header:
+                raise ValueError('图片数据格式无效')
+            raw = base64.b64decode(encoded, validate=True)
+            data, mime, _ = prepare_image(raw, decoration=bool(roles.get(path)), original=original_images)
+        except ValueError:
+            raise ValueError('图片预处理失败：' + path + '；请检查图片或先处理超出 500 KiB 的装饰图/动图') from None
+        largest = max(largest, len(data))
+        prepared[path] = 'data:' + mime + ';base64,' + base64.b64encode(data).decode('ascii')
+    payload['images'] = prepared
+    return largest
+
 
 class ApiFailure(RuntimeError):
     def __init__(self, method, path, response):
@@ -98,6 +120,7 @@ def main():
     parser.add_argument('--public-base', required=True, help='Public HTTPS origin for image links')
     parser.add_argument('--cache', help='Persistent upload map; contains URLs, never credentials')
     parser.add_argument('--folder', required=True, help='Folder for newly uploaded images, e.g. the issue number')
+    parser.add_argument('--original-images', action='store_true', help='仅在明确要求时跳过 500 KiB 限制，按输入字节上传')
     credentials = parser.add_mutually_exclusive_group()
     credentials.add_argument('--keychain', help='macOS Keychain service/account')
     credentials.add_argument('--token-file')
@@ -125,6 +148,7 @@ def main():
     payload = json.loads(soup.select_one('#local-payload').string)
     if not payload.get('images'):
         raise ValueError('预览不含本地图片数据，请先 render')
+    largest_image = prepare_payload_images(payload, args.original_images)
     client, anonymous = session_for(api), session_for(public)
     client.headers['Authorization'] = get_token(args)
     user = api_call(client, api, 'GET', '/api/user')['user']
@@ -209,6 +233,9 @@ def main():
         'public_anonymous_byte_verification': True,
         'verified_at': payload['imageHostVerifiedAt'],
         'wechat_editor_roundtrip_verified': False,
+        'max_image_bytes': largest_image,
+        'image_cap_enforced': not args.original_images,
+        'image_policy': POLICY_VERSION,
     })
     print(f'已生成 preview-hosted.html：上传 {uploaded}，复用 {reused}；凭证未写入产物。')
 
