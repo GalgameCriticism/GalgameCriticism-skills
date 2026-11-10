@@ -4,7 +4,7 @@
 
 只需安装本 skill；不要求图床、公众号 API 密钥、浏览器扩展或其他平台技能。
 
-内部成员先看 [使用手册与任务模板](references/internal-guide.md)。每期请主动提供文稿、封面、图包、推荐阅读的周报及留言板链接、Staff；选择图床方案时另提供图床地址和登录方式/凭证引用。公共 skill 不保存任何真实图床配置或凭证。
+安装和调用见 [用户手册](references/internal-guide.md)。每期请主动提供文稿、封面、图包、推荐阅读的周报及留言板链接、Staff；选择图床方案时另提供图床地址和登录方式/凭证引用。公共 skill 不保存任何真实图床配置或凭证。
 
 如需解决多图 Base64 粘贴失败，可选择 [自建 Zipline 图床导出](references/image-host.md)：先上传并核验 HTTPS 直链，再打开 `preview-hosted.html` 一键复制。图床由使用者指定，凭证运行时读取；支持内部统一分发普通上传账号的 Token。
 

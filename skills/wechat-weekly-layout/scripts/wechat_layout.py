@@ -203,6 +203,8 @@ def generic_gallery(gallery, resolve, assets, static=False, hint_id=None):
     ids = gallery.get('images', [])
     if not ids:
         return ''
+    if len(ids) == 1:
+        return '<section style="margin:12px 0;border-radius:12px;overflow:hidden;line-height:0;">' + image_tag(resolve(ids[0])) + '</section>'
     mode = gallery.get('mode', 'swipe')
     if mode == 'swipe' and not static:
         tiles = ''.join('<section style="display:inline-block;vertical-align:middle;width:80%;padding:0 5px;box-sizing:border-box;white-space:normal;"><section style="border-radius:12px;overflow:hidden;line-height:0;box-sizing:border-box;">' + image_tag(resolve(k)) + '</section></section>' for k in ids)
@@ -252,6 +254,21 @@ def bound_layout(fragment):
             element['style'] = 'display:flex;flex-flow:row nowrap;width:100%;max-width:100%;min-width:0;box-sizing:border-box;'
         elif 'flex' in props and props.get('flex', '').startswith('100 100'):
             element['style'] = style.rstrip(';') + ';min-width:0;'
+    for track in soup.find_all('section'):
+        if not re.search(r'overflow-x\s*:\s*(auto|scroll)', track.get('style', ''), re.I):
+            continue
+        images = track.find_all('img')
+        if len(images) != 1:
+            continue
+        hint = track.find_previous_sibling()
+        if hint and (re.search(r'左右滑动|左滑查看更多', hint.get_text()) or any(
+                re.search(r'gallery-swipe|左右滑动|左滑查看更多', img.get('src', '') + img.get('alt', ''))
+                for img in hint.find_all('img'))):
+            hint.decompose()
+        image = images[0].extract()
+        track.clear()
+        track['style'] = 'margin:12px 0;width:100%;border-radius:12px;overflow:hidden;line-height:0;box-sizing:border-box;'
+        track.append(image)
     for svg in soup.find_all('svg'):
         animation = svg.find('animate', recursive=False)
         if not animation or animation.get('attributename', '').lower() != 'width':
